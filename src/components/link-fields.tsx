@@ -1,0 +1,78 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/field";
+import { MAX_PROJECT_LINKS, type ProjectLink } from "@/lib/text";
+
+/**
+ * Enlaces extra del proyecto: docs, demo, changelog, lo que quiera sumar quien
+ * publica. Es opcional; se guarda como JSON en la ficha.
+ */
+export function LinkFields({
+  links,
+  onChange,
+}: {
+  links: ProjectLink[];
+  onChange: (next: ProjectLink[]) => void;
+}) {
+  function update(index: number, patch: Partial<ProjectLink>) {
+    onChange(links.map((link, i) => (i === index ? { ...link, ...patch } : link)));
+  }
+
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium">Enlaces extra</legend>
+      <p className="mt-1 text-xs text-muted">
+        Opcional. Documentacion, demo, changelog: hasta {MAX_PROJECT_LINKS}.
+      </p>
+
+      <div className="mt-3 space-y-2">
+        {links.map((link, index) => (
+          <div key={index} className="flex gap-2">
+            <Input
+              aria-label={`Nombre del enlace ${index + 1}`}
+              value={link.label}
+              maxLength={40}
+              onChange={(event) => update(index, { label: event.target.value })}
+              placeholder="Documentacion"
+              className="w-1/3"
+            />
+            <Input
+              aria-label={`Direccion del enlace ${index + 1}`}
+              value={link.url}
+              onChange={(event) => update(index, { url: event.target.value })}
+              placeholder="https://docs.tuproyecto.cr"
+              className="flex-1"
+            />
+            <Button
+              icon
+              variant="ghost"
+              aria-label={`Quitar el enlace ${index + 1}`}
+              onClick={() => onChange(links.filter((_, i) => i !== index))}
+            >
+              <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" />
+              </svg>
+            </Button>
+          </div>
+        ))}
+      </div>
+
+      {links.length < MAX_PROJECT_LINKS ? (
+        <Button
+          size="sm"
+          className="mt-3"
+          onClick={() => onChange([...links, { label: "", url: "" }])}
+        >
+          <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M8 3.5v9M3.5 8h9" strokeLinecap="round" />
+          </svg>
+          Agregar enlace
+        </Button>
+      ) : null}
+
+      {/* El servidor recibe el JSON y lo vuelve a validar. */}
+      <input type="hidden" name="links" value={JSON.stringify(links)} />
+    </fieldset>
+  );
+}

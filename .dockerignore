@@ -1,0 +1,8 @@
+node_modules
+.next
+.git
+.idea
+.junie
+npm-debug.log
+.env*.local
+README.md

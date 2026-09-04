@@ -1,0 +1,183 @@
+/* =====================================================================
+   El unico lugar donde se definen valores de diseno.
+   Ningun componente escribe un color, un radio o una duracion a mano:
+   todos consumen las utilidades que salen de estos tokens.
+
+   Tailwind 4 no usa tailwind.config.js: el bloque @theme ES la config,
+   y cada namespace genera utilidades (--color-* -> bg-*, --height-* -> h-*).
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   1. Paleta cruda, por tema.
+   --------------------------------------------------------------------- */
+:root {
+  --p-bg: oklch(0.985 0.001 100);
+  --p-bg-sunken: oklch(0.965 0.002 100);
+  --p-surface: oklch(1 0 0);
+  --p-surface-2: oklch(0.968 0.002 100);
+  --p-surface-3: oklch(0.94 0.003 100);
+  --p-border: oklch(0.915 0.003 100);
+  --p-border-strong: oklch(0.85 0.004 100);
+  --p-text: oklch(0.19 0.006 90);
+  --p-muted: oklch(0.44 0.009 90);
+  --p-faint: oklch(0.55 0.008 90);
+
+  --p-ink: oklch(0.19 0.006 90);
+  --p-ink-contrast: oklch(1 0 0);
+
+  --p-accent: oklch(0.52 0.17 258);
+  --p-accent-strong: oklch(0.44 0.17 258);
+  --p-accent-soft: oklch(0.955 0.03 258);
+  --p-accent-contrast: oklch(1 0 0);
+
+  --p-flag: oklch(0.55 0.2 25);
+  --p-flag-soft: oklch(0.955 0.035 25);
+
+  --p-shimmer: oklch(0.99 0.001 100);
+  --p-overlay: oklch(0.19 0.006 90 / 0.5);
+  --p-shadow: 220 10% 20%;
+
+  color-scheme: light;
+}
+
+/* Sistema en oscuro, sin eleccion explicita del usuario. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --p-bg: oklch(0.145 0.004 100);
+    --p-bg-sunken: oklch(0.115 0.004 100);
+    --p-surface: oklch(0.183 0.005 100);
+    --p-surface-2: oklch(0.222 0.006 100);
+    --p-surface-3: oklch(0.27 0.007 100);
+    --p-border: oklch(0.268 0.006 100);
+    --p-border-strong: oklch(0.38 0.008 100);
+    --p-text: oklch(0.965 0.002 100);
+    --p-muted: oklch(0.7 0.007 100);
+    --p-faint: oklch(0.55 0.006 100);
+
+    --p-ink: oklch(0.965 0.002 100);
+    --p-ink-contrast: oklch(0.145 0.004 100);
+
+    --p-accent: oklch(0.72 0.15 258);
+    --p-accent-strong: oklch(0.8 0.14 258);
+    --p-accent-soft: oklch(0.28 0.07 258);
+    --p-accent-contrast: oklch(0.13 0.02 258);
+
+    --p-flag: oklch(0.7 0.17 25);
+    --p-flag-soft: oklch(0.28 0.07 25);
+
+    --p-shimmer: oklch(0.3 0.008 100);
+    --p-overlay: oklch(0.08 0.004 100 / 0.55);
+    --p-shadow: 0 0% 0%;
+
+    color-scheme: dark;
+  }
+}
+
+/* Eleccion explicita: gana siempre sobre el sistema. */
+:root[data-theme="dark"] {
+  --p-bg: oklch(0.145 0.004 100);
+  --p-bg-sunken: oklch(0.115 0.004 100);
+  --p-surface: oklch(0.183 0.005 100);
+  --p-surface-2: oklch(0.222 0.006 100);
+  --p-surface-3: oklch(0.27 0.007 100);
+  --p-border: oklch(0.268 0.006 100);
+  --p-border-strong: oklch(0.38 0.008 100);
+  --p-text: oklch(0.965 0.002 100);
+  --p-muted: oklch(0.7 0.007 100);
+  --p-faint: oklch(0.55 0.006 100);
+
+  --p-ink: oklch(0.965 0.002 100);
+  --p-ink-contrast: oklch(0.145 0.004 100);
+
+  --p-accent: oklch(0.72 0.15 258);
+  --p-accent-strong: oklch(0.8 0.14 258);
+  --p-accent-soft: oklch(0.28 0.07 258);
+  --p-accent-contrast: oklch(0.13 0.02 258);
+
+  --p-flag: oklch(0.7 0.17 25);
+  --p-flag-soft: oklch(0.28 0.07 25);
+
+  --p-shimmer: oklch(0.3 0.008 100);
+  --p-overlay: oklch(0.08 0.004 100 / 0.55);
+  --p-shadow: 0 0% 0%;
+
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------------
+   2. La config: tokens semanticos -> utilidades de Tailwind.
+   --------------------------------------------------------------------- */
+@theme inline {
+  /* Color */
+  --color-bg: var(--p-bg);
+  --color-bg-sunken: var(--p-bg-sunken);
+  --color-surface: var(--p-surface);
+  --color-surface-2: var(--p-surface-2);
+  --color-surface-3: var(--p-surface-3);
+  --color-border: var(--p-border);
+  --color-border-strong: var(--p-border-strong);
+  --color-text: var(--p-text);
+  --color-muted: var(--p-muted);
+  --color-faint: var(--p-faint);
+  --color-ink: var(--p-ink);
+  --color-ink-contrast: var(--p-ink-contrast);
+  --color-accent: var(--p-accent);
+  --color-accent-strong: var(--p-accent-strong);
+  --color-accent-soft: var(--p-accent-soft);
+  --color-accent-contrast: var(--p-accent-contrast);
+  --color-flag: var(--p-flag);
+  --color-flag-soft: var(--p-flag-soft);
+  --color-shimmer: var(--p-shimmer);
+  --color-overlay: var(--p-overlay);
+
+  /* Tipografia */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Altura de controles: la escala que hace que todo case.
+     Un boton md, un input md y un dropdown md miden exactamente lo mismo. */
+  --height-control-sm: 2rem;
+  --height-control-md: 2.5rem;
+  --height-control-lg: 3rem;
+
+  /* Radios */
+  --radius-control: 0.625rem;
+  --radius-card: 0.875rem;
+  --radius-media: 0.75rem;
+
+  /* Movimiento */
+  --ease-brand: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-rise: rise 0.5s var(--ease-brand) both;
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+  --animate-fade: fade 0.4s var(--ease-brand) both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}

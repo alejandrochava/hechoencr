@@ -1,0 +1,133 @@
+# Stack local completo: Postgres + GoTrue (auth) + PostgREST + gateway + la app.
+# Es el equivalente casero de Supabase hosted, para desarrollar sin cuenta.
+#
+# Las llaves de abajo son de mentira y solo sirven en esta maquina.
+# En produccion se usan las que da Supabase.
+
+x-jwt-secret: &jwt_secret "super-secret-jwt-token-with-at-least-32-characters-long"
+x-anon-key: &anon_key "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlLWxvY2FsIiwiaWF0IjoxNzA0MDY3MjAwLCJleHAiOjIwMTk0MjcyMDB9.u1akB3lxUHUyhG7H4i29ksh6VlcOgDOVX06_WFJTtFk"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "54322:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  auth:
+    image: supabase/auth:v2.177.0
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      PORT: 9999
+      API_EXTERNAL_URL: http://localhost:8000
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:postgres@db:5432/postgres?sslmode=disable&search_path=auth
+      GOTRUE_SITE_URL: http://localhost:3000
+      GOTRUE_URI_ALLOW_LIST: http://localhost:3000/**
+      GOTRUE_JWT_SECRET: *jwt_secret
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
+      GOTRUE_SMTP_HOST: mail
+      GOTRUE_SMTP_PORT: 1025
+      GOTRUE_SMTP_USER: dev
+      GOTRUE_SMTP_PASS: dev
+      GOTRUE_SMTP_ADMIN_EMAIL: hola@hechoencr.local
+      GOTRUE_SMTP_SENDER_NAME: Hecho en CR
+      # Sin esto los enlaces del correo salen sin el prefijo /auth/v1 y el
+      # gateway no los encuentra.
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/v1/verify
+      GOTRUE_LOG_LEVEL: info
+
+  rest:
+    image: postgrest/postgrest:v12.2.12
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PGRST_DB_URI: postgres://authenticator:postgres@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: *jwt_secret
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+
+  gateway:
+    image: nginx:1.27-alpine
+    depends_on: [auth, rest]
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8000:8000"
+
+  mail:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+
+  # Aplica schema.sql, los permisos y (opcional) los datos de ejemplo.
+  # Corre una vez y termina.
+  migrate:
+    image: postgres:16-alpine
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    environment:
+      POSTGRES_PASSWORD: postgres
+      SEED_DEMO_DATA: "true"
+    volumes:
+      - ./supabase:/sql:ro
+      - ./docker/grants.sql:/grants.sql:ro
+      - ./docker/migrate.sh:/migrate.sh:ro
+    entrypoint: ["sh", "/migrate.sh"]
+
+  web:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: http://localhost:8000
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: *anon_key
+        NEXT_PUBLIC_SITE_URL: http://localhost:3000
+    depends_on:
+      gateway:
+        condition: service_started
+      mail:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      # Dentro de la red de Docker "localhost" es el propio contenedor,
+      # asi que el servidor habla con el gateway por su nombre de servicio.
+      SUPABASE_INTERNAL_URL: http://gateway:8000
+      # Los avisos de contacto caen en Mailpit (http://localhost:8025).
+      # La direccion real se pasa por variable de entorno, nunca al repositorio.
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-buzon@hechoencr.local}
+      SMTP_HOST: mail
+      SMTP_PORT: 1025
+      SMTP_FROM: Hecho en CR <no-reply@hechoencr.local>
+    ports:
+      - "3000:3000"
+
+volumes:
+  db-data:

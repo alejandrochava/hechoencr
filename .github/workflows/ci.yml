@@ -1,0 +1,42 @@
+name: CI
+
+# Corre en cada push y en cada PR a las ramas principales.
+# Todo tiene que quedar verde para poder mergear o desplegar.
+on:
+  push:
+    branches: [dev, main, produccion]
+  pull_request:
+    branches: [dev, main, produccion]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    name: Lint, tests y build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        # Las NEXT_PUBLIC_* se incrustan al compilar. Para verificar que el
+        # build funciona alcanza con valores de mentira: no se conecta a nada.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci.example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: llave-de-mentira-para-ci
+        run: npm run build
