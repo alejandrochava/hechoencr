@@ -33,8 +33,10 @@ export const AUTH_LIMIT: Limit = { max: 6, windowMs: 300_000 };
 
 export type Verdict = { allowed: boolean; retryAfterSeconds: number };
 
-const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL;
-const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const clean = (value: string | undefined) => (value && value.trim() ? value.trim() : "");
+
+const REDIS_URL = clean(process.env.UPSTASH_REDIS_REST_URL);
+const REDIS_TOKEN = clean(process.env.UPSTASH_REDIS_REST_TOKEN);
 
 export const usingSharedCounter = Boolean(REDIS_URL && REDIS_TOKEN);
 

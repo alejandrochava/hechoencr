@@ -1,5 +1,7 @@
 /** URL publica: la que usa el navegador. Se incrusta en el bundle al compilar. */
-export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const clean = (value: string | undefined) => (value && value.trim() ? value.trim() : "");
+
+export const SUPABASE_URL = clean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
 /**
  * URL interna para el servidor. En Docker el contenedor no puede usar
@@ -8,14 +10,13 @@ export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
  */
 export const SUPABASE_SERVER_URL =
   typeof window === "undefined"
-    ? (process.env.SUPABASE_INTERNAL_URL || SUPABASE_URL)
+    ? (clean(process.env.SUPABASE_INTERNAL_URL) || SUPABASE_URL)
     : SUPABASE_URL;
 
 /** Supabase renombro la "anon key" a "publishable key"; aceptamos las dos. */
 export const SUPABASE_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-  "";
+  clean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) ||
+  clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_KEY);
 

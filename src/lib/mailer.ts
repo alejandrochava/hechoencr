@@ -16,10 +16,12 @@ import "server-only";
  * aviso, no el canal principal.
  */
 
-const to = process.env.CONTACT_EMAIL;
-const from = process.env.MAIL_FROM ?? "Hecho en CR <onboarding@resend.dev>";
-const resendKey = process.env.RESEND_API_KEY;
-const smtpHost = process.env.SMTP_HOST;
+const clean = (value: string | undefined) => (value && value.trim() ? value.trim() : "");
+
+const to = clean(process.env.CONTACT_EMAIL);
+const from = clean(process.env.MAIL_FROM) || "Hecho en CR <onboarding@resend.dev>";
+const resendKey = clean(process.env.RESEND_API_KEY);
+const smtpHost = clean(process.env.SMTP_HOST);
 
 export const mailerConfigured = Boolean(to && (resendKey || smtpHost));
 

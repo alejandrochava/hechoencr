@@ -1,13 +1,23 @@
 /**
- * Configuracion de marca. Cambiar el nombre aqui lo cambia en todo el sitio.
+ * Lee una variable tratando el vacio como ausente.
+ *
+ * `??` solo cubre undefined: si el entorno define la variable en blanco (pasa
+ * seguido cuando un secret no existe en CI), el valor vacio se cuela y rompe
+ * mas adelante. Aca un string en blanco vale lo mismo que no estar.
  */
+function env(name: string, fallback: string) {
+  const value = process.env[name];
+  return value && value.trim() ? value.trim() : fallback;
+}
+
+/** Configuracion de marca. Cambiar el nombre aqui lo cambia en todo el sitio. */
 export const site = {
   name: "Hecho en CR",
   short: "hechoencr",
   tagline: "El directorio de proyectos hechos en Costa Rica",
   description:
     "Descubri las herramientas, apps y proyectos que se estan construyendo en Costa Rica. Publica el tuyo y vota los que te sirvan.",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  url: env("NEXT_PUBLIC_SITE_URL", "http://localhost:3000"),
 };
 
 /**
