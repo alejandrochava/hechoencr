@@ -25,6 +25,11 @@
   --p-ink: oklch(0.19 0.006 90);
   --p-ink-contrast: oklch(1 0 0);
 
+  /* La perilla de un switch es clara en los dos temas: es lo que la separa
+     tanto del riel apagado como del encendido. Por eso no puede salir de la
+     escala de superficies, que se invierte de un tema al otro. */
+  --p-knob: oklch(1 0 0);
+
   --p-accent: oklch(0.52 0.17 258);
   --p-accent-strong: oklch(0.44 0.17 258);
   --p-accent-soft: oklch(0.955 0.03 258);
@@ -56,6 +61,8 @@
 
     --p-ink: oklch(0.965 0.002 100);
     --p-ink-contrast: oklch(0.145 0.004 100);
+
+    --p-knob: oklch(0.93 0.002 100);
 
     --p-accent: oklch(0.72 0.15 258);
     --p-accent-strong: oklch(0.8 0.14 258);
@@ -89,6 +96,8 @@
   --p-ink: oklch(0.965 0.002 100);
   --p-ink-contrast: oklch(0.145 0.004 100);
 
+  --p-knob: oklch(0.93 0.002 100);
+
   --p-accent: oklch(0.72 0.15 258);
   --p-accent-strong: oklch(0.8 0.14 258);
   --p-accent-soft: oklch(0.28 0.07 258);
@@ -121,6 +130,7 @@
   --color-faint: var(--p-faint);
   --color-ink: var(--p-ink);
   --color-ink-contrast: var(--p-ink-contrast);
+  --color-knob: var(--p-knob);
   --color-accent: var(--p-accent);
   --color-accent-strong: var(--p-accent-strong);
   --color-accent-soft: var(--p-accent-soft);
