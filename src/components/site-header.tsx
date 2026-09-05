@@ -6,31 +6,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Container } from "@/components/ui/primitives";
 import { signOut } from "@/lib/actions";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createClient } from "@/lib/supabase/server";
-
-async function getViewer() {
-  if (!isSupabaseConfigured) return null;
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("handle, display_name, avatar_url, is_admin")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  return {
-    handle: (profile?.handle as string | null) ?? null,
-    name: (profile?.display_name as string | null) ?? user.email?.split("@")[0] ?? "vos",
-    avatar: (profile?.avatar_url as string | null) ?? null,
-    isAdmin: Boolean(profile?.is_admin),
-  };
-}
+import { getViewer } from "@/lib/queries";
 
 export async function SiteHeader() {
   const viewer = await getViewer();

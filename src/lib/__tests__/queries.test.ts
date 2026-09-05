@@ -13,7 +13,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const dobles = vi.hoisted(() => ({ cliente: null as unknown, configurado: true }));
 
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => dobles.cliente }));
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => dobles.cliente,
+  // El modulo real lo envuelve en el cache de React, que fuera de un render no
+  // existe; aca alcanza con preguntarle al cliente falso lo mismo.
+  getCurrentUser: async () => (await dobles.cliente.auth.getUser()).data.user,
+}));
 
 // Un getter y no un valor: hay una prueba que necesita el proyecto sin
 // configurar, y el modulo real lo resuelve una sola vez al cargarse.

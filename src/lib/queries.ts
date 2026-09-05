@@ -1,6 +1,8 @@
+import { cache } from "react";
+
 import { SORTS, type SortKey } from "@/lib/site";
 import { sanitizeProjectLinks, sanitizeSearch } from "@/lib/text";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type {
   ContactMessage,
@@ -90,10 +92,7 @@ export async function getProject(slug: string): Promise<ProjectDetail | null> {
 export async function getVotedIds(projectIds: string[]): Promise<Set<string>> {
   if (!isSupabaseConfigured || projectIds.length === 0) return new Set();
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([createClient(), getCurrentUser()]);
   if (!user) return new Set();
 
   const { data } = await supabase
@@ -108,10 +107,7 @@ export async function getVotedIds(projectIds: string[]): Promise<Set<string>> {
 export async function getMyClaimStatus(projectId: string) {
   if (!isSupabaseConfigured) return null;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([createClient(), getCurrentUser()]);
   if (!user) return null;
 
   const { data } = await supabase
@@ -124,17 +120,42 @@ export async function getMyClaimStatus(projectId: string) {
   return (data?.status as "pending" | "approved" | "rejected" | undefined) ?? null;
 }
 
-export async function isCurrentUserAdmin() {
-  if (!isSupabaseConfigured) return false;
+/**
+ * El perfil de quien esta mirando, con el usuario que lo respalda.
+ *
+ * Lo piden el encabezado (nombre, avatar, si es admin) y el guardia de las
+ * paginas de admin. Es la misma fila: cacheada, se lee una vez por request.
+ */
+export const getViewer = cache(async () => {
+  if (!isSupabaseConfigured) return null;
+
+  const user = await getCurrentUser();
+  if (!user) return null;
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return false;
+  const { data } = await supabase
+    .from("profiles")
+    .select("handle, display_name, avatar_url, is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
 
-  const { data } = await supabase.from("profiles").select("is_admin").eq("id", user.id).maybeSingle();
-  return Boolean(data?.is_admin);
+  const profile = data as {
+    handle: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+    is_admin: boolean | null;
+  } | null;
+
+  return {
+    handle: profile?.handle ?? null,
+    name: profile?.display_name ?? user.email?.split("@")[0] ?? "vos",
+    avatar: profile?.avatar_url ?? null,
+    isAdmin: Boolean(profile?.is_admin),
+  };
+});
+
+export async function isCurrentUserAdmin() {
+  return Boolean((await getViewer())?.isAdmin);
 }
 
 export async function getPendingClaims(): Promise<PendingClaim[]> {
