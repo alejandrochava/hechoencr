@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatPhoneCR,
   githubOwner,
+  titleFromSlug,
   isPublicHttpUrl,
   repoRef,
   emailDomain,
@@ -311,5 +312,30 @@ describe("isPublicHttpUrl", () => {
     expect(isPublicHttpUrl("http://[::ffff:127.0.0.1]/")).toBe(false);
     expect(isPublicHttpUrl("http://[::ffff:7f00:1]/")).toBe(false);
     expect(isPublicHttpUrl("http://[::ffff:808:808]/")).toBe(true);
+  });
+});
+
+describe("titleFromSlug", () => {
+  it("convierte el nombre de un repo en un titulo", () => {
+    expect(titleFromSlug("consulta-de-placas")).toBe("Consulta De Placas");
+    expect(titleFromSlug("consulta_placas_cr")).toBe("Consulta Placas Cr");
+    expect(titleFromSlug("mi.proyecto.tico")).toBe("Mi Proyecto Tico");
+  });
+
+  it("no toca lo que ya viene escrito como titulo", () => {
+    expect(titleFromSlug("HechoEnCR")).toBe("HechoEnCR");
+  });
+
+  it("aguanta separadores repetidos y de sobra", () => {
+    expect(titleFromSlug("--api__de---placas--")).toBe("Api De Placas");
+  });
+
+  it("respeta el tope de 60 del campo", () => {
+    expect(titleFromSlug("a".repeat(80)).length).toBe(60);
+  });
+
+  it("con basura devuelve una cadena vacia, no revienta", () => {
+    expect(titleFromSlug("")).toBe("");
+    expect(titleFromSlug("---")).toBe("");
   });
 });

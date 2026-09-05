@@ -149,6 +149,25 @@ export function isPublicHttpUrl(raw: string) {
   return !isPrivateAddress(host);
 }
 
+/**
+ * Convierte el nombre de un repositorio en un titulo presentable.
+ *
+ * Los repos se llaman "consulta-de-placas" o "consulta_placas_cr"; el
+ * directorio muestra "Consulta De Placas". No adivina mas que eso: quien
+ * publica corrige el titulo si quiere, y es mejor eso que dejarlo escribir
+ * todo de cero.
+ */
+export function titleFromSlug(value: string) {
+  return value
+    .replace(/[-_.]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map((palabra) => palabra.charAt(0).toUpperCase() + palabra.slice(1))
+    .join(" ")
+    .slice(0, 60);
+}
+
 /* ---------------------------------------------------------------------
    Repositorios
    --------------------------------------------------------------------- */

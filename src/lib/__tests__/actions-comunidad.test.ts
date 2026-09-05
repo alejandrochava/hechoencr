@@ -22,6 +22,7 @@ vi.mock("@/lib/link-check", () => ({
   checkProjectLinks: vi.fn(),
 }));
 vi.mock("@/lib/preview", () => ({ findPreviewImage: vi.fn() }));
+vi.mock("@/lib/github", () => ({ listPublicRepos: vi.fn() }));
 vi.mock("@/lib/queries", () => ({ isCurrentUserAdmin: vi.fn() }));
 vi.mock("@/lib/email", () => ({ domainAcceptsMail: vi.fn() }));
 vi.mock("@/lib/mailer", () => ({ notifyNewMessage: vi.fn() }));
@@ -29,11 +30,13 @@ vi.mock("@/lib/mailer", () => ({ notifyNewMessage: vi.fn() }));
 import { revalidatePath } from "next/cache";
 
 import { domainAcceptsMail } from "@/lib/email";
+import { listPublicRepos } from "@/lib/github";
 import { notifyNewMessage } from "@/lib/mailer";
 import {
   checkRegistration,
   claimProject,
   claimWithGithub,
+  listMyGithubRepos,
   markMessageHandled,
   resolveClaim,
   sendMessage,
@@ -510,5 +513,175 @@ describe("signOut", () => {
 
     expect(authCalls).toEqual(["signOut"]);
     expect(destino).toBe("/");
+  });
+});
+
+describe("listMyGithubRepos", () => {
+  const REPO = {
+    name: "consulta-de-placas",
+    fullName: "alejandra/consulta-de-placas",
+    description: "Historial de un vehiculo por su placa.",
+    homepage: "https://placas.cr",
+    htmlUrl: "https://github.com/alejandra/consulta-de-placas",
+    topics: ["open-data", "typescript"],
+    stars: 12,
+    language: "TypeScript",
+    archived: false,
+    pushedAt: "2026-09-01T00:00:00Z",
+  };
+
+  it("sin sesion no consulta GitHub", async () => {
+    db({ user: null });
+
+    const estado = await listMyGithubRepos();
+
+    expect(estado).toEqual({
+      ok: false,
+      message: "Entra con tu cuenta para traer tus repositorios.",
+    });
+    expect(listPublicRepos).not.toHaveBeenCalled();
+  });
+
+  it("sin cuenta de GitHub enlazada, dice como enlazarla", async () => {
+    // Perfil sin handle y sesion sin identidad de GitHub.
+    db({ user: { id: "u1", identities: [{ provider: "email" }] }, singles: [{ data: {} }] });
+
+    const estado = await listMyGithubRepos();
+
+    expect(estado.ok).toBe(false);
+    expect(estado.ok === false && estado.message).toContain("Conecta tu cuenta de GitHub");
+    expect(listPublicRepos).not.toHaveBeenCalled();
+  });
+
+  it("usa el handle guardado en el perfil", async () => {
+    db({
+      user: { id: "u1" },
+      singles: [{ data: { github_handle: "alejandra" } }],
+      reads: [{ data: [] }],
+    });
+    vi.mocked(listPublicRepos).mockResolvedValue({ ok: true, repos: [REPO] });
+
+    await listMyGithubRepos();
+
+    expect(listPublicRepos).toHaveBeenCalledWith("alejandra");
+  });
+
+  /*
+   * Quien acaba de entrar con GitHub tiene la identidad en la sesion antes de
+   * que syncGithubHandle haya guardado el handle en el perfil.
+   */
+  it("cae a la identidad de la sesion si el perfil todavia no lo tiene", async () => {
+    db({
+      user: {
+        id: "u1",
+        identities: [{ provider: "github", identity_data: { user_name: "alejandra" } }],
+      },
+      singles: [{ data: { github_handle: null } }],
+      reads: [{ data: [] }],
+    });
+    vi.mocked(listPublicRepos).mockResolvedValue({ ok: true, repos: [REPO] });
+
+    const estado = await listMyGithubRepos();
+
+    expect(estado.ok && estado.handle).toBe("alejandra");
+    expect(listPublicRepos).toHaveBeenCalledWith("alejandra");
+  });
+
+  it("arma el borrador del formulario a partir del repo", async () => {
+    db({
+      user: { id: "u1" },
+      singles: [{ data: { github_handle: "alejandra" } }],
+      reads: [{ data: [] }],
+    });
+    vi.mocked(listPublicRepos).mockResolvedValue({ ok: true, repos: [REPO] });
+
+    const estado = await listMyGithubRepos();
+
+    expect(estado.ok && estado.repos[0]).toEqual({
+      // El nombre del repo se vuelve un titulo presentable.
+      name: "Consulta De Placas",
+      fullName: "alejandra/consulta-de-placas",
+      tagline: "Historial de un vehiculo por su placa.",
+      // El enlace es el sitio, no el repo, cuando el repo declara homepage.
+      url: "https://placas.cr",
+      repoUrl: "https://github.com/alejandra/consulta-de-placas",
+      // "typescript" no dice de que es el proyecto; "open-data" si.
+      tags: ["datos"],
+      stars: 12,
+      language: "TypeScript",
+      archived: false,
+      alreadyListed: false,
+    });
+  });
+
+  it("sin homepage, el enlace es el propio repositorio", async () => {
+    db({
+      user: { id: "u1" },
+      singles: [{ data: { github_handle: "alejandra" } }],
+      reads: [{ data: [] }],
+    });
+    vi.mocked(listPublicRepos).mockResolvedValue({
+      ok: true,
+      repos: [{ ...REPO, homepage: null }],
+    });
+
+    const estado = await listMyGithubRepos();
+
+    expect(estado.ok && estado.repos[0].url).toBe(REPO.htmlUrl);
+  });
+
+  it("una descripcion demasiado corta se deja vacia, que la bajada pide diez", async () => {
+    db({
+      user: { id: "u1" },
+      singles: [{ data: { github_handle: "alejandra" } }],
+      reads: [{ data: [] }],
+    });
+    vi.mocked(listPublicRepos).mockResolvedValue({
+      ok: true,
+      repos: [{ ...REPO, description: "placas" }],
+    });
+
+    const estado = await listMyGithubRepos();
+
+    expect(estado.ok && estado.repos[0].tagline).toBe("");
+  });
+
+  it("marca los que ya estan en el directorio", async () => {
+    const { consultas } = db({
+      user: { id: "u1" },
+      singles: [{ data: { github_handle: "alejandra" } }],
+      reads: [{ data: [{ repo_url: REPO.htmlUrl }] }],
+    });
+    vi.mocked(listPublicRepos).mockResolvedValue({
+      ok: true,
+      repos: [REPO, { ...REPO, name: "otro", htmlUrl: "https://github.com/alejandra/otro" }],
+    });
+
+    const estado = await listMyGithubRepos();
+
+    expect(estado.ok && estado.repos.map((repo) => repo.alreadyListed)).toEqual([true, false]);
+    // Se pregunta por los repos que se van a mostrar, no por toda la tabla.
+    expect(consultas.at(-1)?.in).toEqual([
+      "repo_url",
+      [REPO.htmlUrl, "https://github.com/alejandra/otro"],
+    ]);
+  });
+
+  it("traduce cada fallo de GitHub a algo que se pueda leer", async () => {
+    const esperado = {
+      "no-existe": "No encontramos la cuenta @alejandra en GitHub.",
+      limite: "GitHub nos pidio esperar un momento. Proba de nuevo en unos minutos.",
+      "sin-respuesta": "No pudimos hablar con GitHub. Proba de nuevo en un rato.",
+    } as const;
+
+    for (const [reason, message] of Object.entries(esperado)) {
+      db({ user: { id: "u1" }, singles: [{ data: { github_handle: "alejandra" } }] });
+      vi.mocked(listPublicRepos).mockResolvedValue({
+        ok: false,
+        reason: reason as keyof typeof esperado,
+      });
+
+      expect(await listMyGithubRepos(), reason).toEqual({ ok: false, message });
+    }
   });
 });

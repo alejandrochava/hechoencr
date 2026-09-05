@@ -53,6 +53,80 @@ export function tagLabel(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+/**
+ * Como se traduce un topic de GitHub a una categoria del directorio.
+ *
+ * Solo lo que se puede afirmar: un repo con el topic "openapi" es una API, uno
+ * con "machine-learning" es IA. Lo que no calza no se fuerza —un "typescript"
+ * no dice de que es el proyecto— y quien publica elige a mano.
+ */
+const TOPIC_ALIASES: Record<string, string> = {
+  "open-source": "open source",
+  opensource: "open source",
+  oss: "open source",
+  "developer-tools": "dev tools",
+  devtools: "dev tools",
+  cli: "dev tools",
+  "rest-api": "api",
+  openapi: "api",
+  graphql: "api",
+  "machine-learning": "ia",
+  ml: "ia",
+  ai: "ia",
+  llm: "ia",
+  "open-data": "datos",
+  data: "datos",
+  dataset: "datos",
+  "data-visualization": "datos",
+  "open-government": "gobierno abierto",
+  govtech: "gobierno abierto",
+  civictech: "gobierno abierto",
+  maps: "mapas",
+  gis: "mapas",
+  mapping: "mapas",
+  fintech: "finanzas",
+  finance: "finanzas",
+  payments: "finanzas",
+  transport: "movilidad",
+  transit: "movilidad",
+  mobility: "movilidad",
+  education: "educacion",
+  learning: "educacion",
+  health: "salud",
+  healthcare: "salud",
+  tourism: "turismo",
+  travel: "turismo",
+  ecommerce: "ecommerce",
+  "e-commerce": "ecommerce",
+  shop: "ecommerce",
+  game: "juegos",
+  games: "juegos",
+  gamedev: "juegos",
+  community: "comunidad",
+  utility: "utilidades",
+  utilities: "utilidades",
+  tools: "utilidades",
+  saas: "saas",
+};
+
+/** Categorias que se pueden deducir de los topics, sin repetir y hasta tres. */
+export function tagsFromTopics(topics: readonly string[]): string[] {
+  const encontradas: string[] = [];
+
+  for (const topic of topics) {
+    const limpio = topic.trim().toLowerCase();
+    const candidata = TOPIC_ALIASES[limpio] ?? limpio;
+
+    if (!TAG_VALUES.includes(candidata)) continue;
+    if (encontradas.includes(candidata)) continue;
+
+    encontradas.push(candidata);
+    if (encontradas.length === 3) break;
+  }
+
+  return encontradas;
+}
+
 export const SORTS = {
   destacados: {
     label: "Destacados",

@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { listPublicRepos } from "@/lib/github";
 import { checkProjectLinks, checkRepo, checkSite } from "@/lib/link-check";
 import { findPreviewImage } from "@/lib/preview";
 import { isCurrentUserAdmin } from "@/lib/queries";
-import { TAG_VALUES } from "@/lib/site";
+import { TAG_VALUES, tagsFromTopics } from "@/lib/site";
 import { domainAcceptsMail } from "@/lib/email";
 import { notifyNewMessage } from "@/lib/mailer";
 import {
@@ -20,6 +21,7 @@ import {
   normalizeUrl,
   sanitizeProjectLinks,
   slugify,
+  titleFromSlug,
   type ProjectLink,
 } from "@/lib/text";
 import { createClient } from "@/lib/supabase/server";
@@ -315,6 +317,102 @@ export async function updateProject(_prev: ActionState, formData: FormData): Pro
  * Guarda el usuario de GitHub que trae la identidad de OAuth. No lo escribe la
  * persona a mano: es lo unico que hace confiable la verificacion por repo.
  */
+/** Un repositorio listo para llenar el formulario de publicar. */
+export type ImportableRepo = {
+  name: string;
+  fullName: string;
+  tagline: string;
+  url: string;
+  repoUrl: string;
+  tags: string[];
+  stars: number;
+  language: string | null;
+  archived: boolean;
+  /** Ya esta en el directorio: se muestra, pero no se ofrece publicarlo otra vez. */
+  alreadyListed: boolean;
+};
+
+export type ReposState =
+  | { ok: true; handle: string; repos: ImportableRepo[] }
+  | { ok: false; message: string };
+
+/**
+ * Los repositorios publicos de quien esta con sesion, listos para publicar.
+ *
+ * El nombre y la bajada salen del repo pero no son la ultima palabra: el
+ * formulario queda editable y la validacion es la misma de siempre. Esto ahorra
+ * escribir ocho campos, no se saltea ninguna regla.
+ */
+export async function listMyGithubRepos(): Promise<ReposState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { ok: false, message: "Entra con tu cuenta para traer tus repositorios." };
+
+  /*
+   * Se prueba el perfil y, si esta vacio, la identidad de la sesion: alguien
+   * que acaba de entrar con GitHub tiene la identidad antes de que
+   * syncGithubHandle haya corrido.
+   */
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("github_handle")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const handle = (profile?.github_handle as string | null) ?? (await syncGithubHandle());
+
+  if (!handle) {
+    return {
+      ok: false,
+      message: "Conecta tu cuenta de GitHub desde tu perfil y volve a intentar.",
+    };
+  }
+
+  const resultado = await listPublicRepos(handle);
+
+  if (!resultado.ok) {
+    const mensajes = {
+      "no-existe": `No encontramos la cuenta @${handle} en GitHub.`,
+      limite: "GitHub nos pidio esperar un momento. Proba de nuevo en unos minutos.",
+      "sin-respuesta": "No pudimos hablar con GitHub. Proba de nuevo en un rato.",
+    };
+    return { ok: false, message: mensajes[resultado.reason] };
+  }
+
+  // Cuales ya estan publicados, para no ofrecer un duplicado.
+  const urls = resultado.repos.map((repo) => repo.htmlUrl);
+  const { data: existentes } = urls.length
+    ? await supabase.from("projects").select("repo_url").in("repo_url", urls)
+    : { data: [] };
+
+  const publicados = new Set(
+    ((existentes ?? []) as { repo_url: string | null }[]).flatMap((fila) =>
+      fila.repo_url ? [fila.repo_url] : [],
+    ),
+  );
+
+  return {
+    ok: true,
+    handle,
+    repos: resultado.repos.map((repo) => ({
+      name: titleFromSlug(repo.name),
+      fullName: repo.fullName,
+      // La bajada pide diez caracteres; una descripcion mas corta no ayuda.
+      tagline: (repo.description ?? "").length >= 10 ? repo.description!.slice(0, 140) : "",
+      url: repo.homepage ?? repo.htmlUrl,
+      repoUrl: repo.htmlUrl,
+      tags: tagsFromTopics(repo.topics),
+      stars: repo.stars,
+      language: repo.language,
+      archived: repo.archived,
+      alreadyListed: publicados.has(repo.htmlUrl),
+    })),
+  };
+}
+
 export async function syncGithubHandle() {
   const supabase = await createClient();
   const {

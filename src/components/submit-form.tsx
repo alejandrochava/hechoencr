@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import { useAuthModal } from "@/components/auth/auth-modal";
+import { GithubImport } from "@/components/github-import";
 import { EMPTY_DRAFT, ProjectFields, type ProjectDraft } from "@/components/project-fields";
 import { Button } from "@/components/ui/button";
 import { submitProject } from "@/lib/actions";
@@ -104,6 +105,23 @@ export function SubmitForm({ authenticated }: { authenticated: boolean }) {
       noValidate
       className="mt-10 space-y-7"
     >
+      {/*
+        Solo con sesion: sin ella no hay cuenta de GitHub que consultar, y
+        ofrecerlo para que falle seria peor que no ofrecerlo.
+      */}
+      {authenticated ? (
+        <div className="rounded-card border border-dashed border-border-strong p-4">
+          <p className="text-sm font-medium">Publicar algo que ya esta en GitHub</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            Traemos tus repositorios publicos y llenamos el formulario. Podes cambiar lo que
+            quieras antes de publicar.
+          </p>
+          <div className="mt-3">
+            <GithubImport onPick={patch} />
+          </div>
+        </div>
+      ) : null}
+
       <ProjectFields draft={draft} errors={errors} onChange={patch} />
 
       <label className="flex items-start gap-3 rounded-card border border-border p-4">
