@@ -158,6 +158,13 @@ describe("listPublicRepos", () => {
     }
   });
 
+  it("un token rechazado no se confunde con un problema de red", async () => {
+    const listPublicRepos = await cargar();
+    conFetch(respuesta({ message: "Bad credentials" }, 401));
+
+    expect(await listPublicRepos("alejandra")).toEqual({ ok: false, reason: "credencial" });
+  });
+
   it("cualquier otro problema es sin-respuesta", async () => {
     const conError = await cargar();
     conFetch(respuesta({}, 500));

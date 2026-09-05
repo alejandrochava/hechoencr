@@ -538,6 +538,7 @@ describe("listMyGithubRepos", () => {
     expect(estado).toEqual({
       ok: false,
       message: "Entra con tu cuenta para traer tus repositorios.",
+      reintentable: false,
     });
     expect(listPublicRepos).not.toHaveBeenCalled();
   });
@@ -669,19 +670,54 @@ describe("listMyGithubRepos", () => {
 
   it("traduce cada fallo de GitHub a algo que se pueda leer", async () => {
     const esperado = {
-      "no-existe": "No encontramos la cuenta @alejandra en GitHub.",
-      limite: "GitHub nos pidio esperar un momento. Proba de nuevo en unos minutos.",
-      "sin-respuesta": "No pudimos hablar con GitHub. Proba de nuevo en un rato.",
+      "no-existe": {
+        message: "No encontramos la cuenta @alejandra en GitHub.",
+        reintentable: false,
+      },
+      limite: {
+        message: "GitHub nos pidio esperar un momento. Proba de nuevo en unos minutos.",
+        reintentable: true,
+      },
+      credencial: {
+        message:
+          "Esto es un problema nuestro, no tuyo, y ya quedo avisado. Mientras lo arreglamos podes llenar el formulario a mano.",
+        reintentable: false,
+      },
+      "sin-respuesta": {
+        message: "No pudimos hablar con GitHub. Proba de nuevo en un rato.",
+        reintentable: true,
+      },
     } as const;
 
-    for (const [reason, message] of Object.entries(esperado)) {
+    for (const [reason, salida] of Object.entries(esperado)) {
       db({ user: { id: "u1" }, singles: [{ data: { github_handle: "alejandra" } }] });
       vi.mocked(listPublicRepos).mockResolvedValue({
         ok: false,
         reason: reason as keyof typeof esperado,
       });
 
-      expect(await listMyGithubRepos(), reason).toEqual({ ok: false, message });
+      expect(await listMyGithubRepos(), reason).toEqual({ ok: false, ...salida });
     }
+  });
+
+  it("reintentar no se ofrece cuando el token rechazado es el nuestro", async () => {
+    db({ user: { id: "u1" }, singles: [{ data: { github_handle: "alejandra" } }] });
+    vi.mocked(listPublicRepos).mockResolvedValue({ ok: false, reason: "credencial" });
+
+    const estado = await listMyGithubRepos();
+
+    expect(estado.ok).toBe(false);
+    expect(!estado.ok && estado.reintentable).toBe(false);
+  });
+
+  it("sin GitHub conectado, manda al perfil de uno", async () => {
+    db({
+      user: { id: "u1" },
+      singles: [{ data: { handle: "ale", github_handle: null } }, { data: null }],
+    });
+
+    const estado = await listMyGithubRepos();
+
+    expect(!estado.ok && estado.perfilHref).toBe("/u/ale");
   });
 });

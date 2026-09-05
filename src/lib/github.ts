@@ -34,7 +34,7 @@ export type GithubRepo = {
 
 export type ReposResult =
   | { ok: true; repos: GithubRepo[] }
-  | { ok: false; reason: "no-existe" | "limite" | "sin-respuesta" };
+  | { ok: false; reason: "no-existe" | "limite" | "credencial" | "sin-respuesta" };
 
 type Entrada = { resultado: ReposResult; hasta: number };
 
@@ -113,10 +113,13 @@ export async function listPublicRepos(handle: string): Promise<ReposResult> {
       // GitHub usa 403 tanto para el limite como para un token invalido; para
       // quien esta del otro lado el consejo es el mismo: esperar.
       resultado = { ok: false, reason: "limite" };
+    } else if (response.status === 401) {
+      // Nuestro token esta vencido o mal pegado. No es un problema de quien
+      // publica ni algo que se arregle esperando: lo tenemos que cambiar
+      // nosotros, asi que se distingue del resto.
+      console.error(`listPublicRepos: GitHub rechazo nuestro token (401) para @${cuenta}`);
+      resultado = { ok: false, reason: "credencial" };
     } else if (!response.ok) {
-      // Un token vencido o mal pegado da 401 y cae aca: sin esta linea, el
-      // fallo llega al navegador como "no pudimos hablar con GitHub" y en el
-      // servidor no queda nada que mirar.
       console.error(`listPublicRepos: GitHub respondio ${response.status} para @${cuenta}`);
       resultado = { ok: false, reason: "sin-respuesta" };
     } else {

@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import type { ProjectDraft } from "@/components/project-fields";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { Skeleton, Tag } from "@/components/ui/primitives";
@@ -18,13 +18,36 @@ import { tagLabel } from "@/lib/site";
  * enviar se valida igual que siempre. Esto ahorra escribir ocho campos, no
  * saltea ninguna regla.
  */
+
+/** Un fallo con su salida: que decir y que puede hacer quien lo lee. */
+type Fallo = { message: string; reintentable: boolean; perfilHref?: string };
 export function GithubImport({ onPick }: { onPick: (draft: Partial<ProjectDraft>) => void }) {
   const [open, setOpen] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [repos, setRepos] = useState<ImportableRepo[] | null>(null);
   const [handle, setHandle] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<Fallo | null>(null);
   const [busqueda, setBusqueda] = useState("");
+
+  async function traer() {
+    setCargando(true);
+    setError(null);
+
+    const estado = await listMyGithubRepos();
+    setCargando(false);
+
+    if (!estado.ok) {
+      setError({
+        message: estado.message,
+        reintentable: estado.reintentable,
+        perfilHref: estado.perfilHref,
+      });
+      return;
+    }
+
+    setHandle(estado.handle);
+    setRepos(estado.repos);
+  }
 
   async function abrir() {
     setOpen(true);
@@ -32,19 +55,7 @@ export function GithubImport({ onPick }: { onPick: (draft: Partial<ProjectDraft>
     // Ya se trajeron antes: la lista se conserva mientras dure la pagina.
     if (repos) return;
 
-    setCargando(true);
-    setError("");
-
-    const estado = await listMyGithubRepos();
-    setCargando(false);
-
-    if (!estado.ok) {
-      setError(estado.message);
-      return;
-    }
-
-    setHandle(estado.handle);
-    setRepos(estado.repos);
+    await traer();
   }
 
   function elegir(repo: ImportableRepo) {
@@ -95,7 +106,33 @@ export function GithubImport({ onPick }: { onPick: (draft: Partial<ProjectDraft>
             ))}
           </div>
         ) : error ? (
-          <p className="text-sm leading-relaxed text-flag">{error}</p>
+          /*
+           * Un error sin salida deja a la persona trabada mirando texto rojo.
+           * Abajo va siempre que hacer: reintentar donde sirve, conectar la
+           * cuenta si es lo que falta, y seguir a mano, que es lo que siempre
+           * queda disponible.
+           */
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed text-flag">{error.message}</p>
+
+            <div className="flex flex-wrap gap-2">
+              {error.reintentable ? (
+                <Button type="button" size="sm" onClick={traer}>
+                  Reintentar
+                </Button>
+              ) : null}
+
+              {error.perfilHref ? (
+                <ButtonLink href={error.perfilHref} size="sm">
+                  Ir a mi perfil
+                </ButtonLink>
+              ) : null}
+
+              <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
+                Llenar a mano
+              </Button>
+            </div>
+          </div>
         ) : repos && repos.length === 0 ? (
           <p className="text-sm leading-relaxed text-muted">
             No encontramos repositorios publicos en esa cuenta. Podes publicar el proyecto a mano.

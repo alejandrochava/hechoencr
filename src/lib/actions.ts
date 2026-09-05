@@ -332,9 +332,14 @@ export type ImportableRepo = {
   alreadyListed: boolean;
 };
 
+/**
+ * Un fallo no viaja solo: trae tambien la salida. Sin saber si reintentar sirve
+ * y adonde se conecta la cuenta, la pantalla no puede mas que pintar texto rojo
+ * y dejar a la persona sin siguiente paso.
+ */
 export type ReposState =
   | { ok: true; handle: string; repos: ImportableRepo[] }
-  | { ok: false; message: string };
+  | { ok: false; message: string; reintentable: boolean; perfilHref?: string };
 
 /**
  * Los repositorios publicos de quien esta con sesion, listos para publicar.
@@ -349,7 +354,13 @@ export async function listMyGithubRepos(): Promise<ReposState> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return { ok: false, message: "Entra con tu cuenta para traer tus repositorios." };
+  if (!user) {
+    return {
+      ok: false,
+      message: "Entra con tu cuenta para traer tus repositorios.",
+      reintentable: false,
+    };
+  }
 
   /*
    * Se prueba el perfil y, si esta vacio, la identidad de la sesion: alguien
@@ -358,28 +369,52 @@ export async function listMyGithubRepos(): Promise<ReposState> {
    */
   const { data: profile } = await supabase
     .from("profiles")
-    .select("github_handle")
+    .select("handle, github_handle")
     .eq("id", user.id)
     .maybeSingle();
 
   const handle = (profile?.github_handle as string | null) ?? (await syncGithubHandle());
 
   if (!handle) {
+    const propio = profile?.handle as string | null | undefined;
     return {
       ok: false,
       message: "Conecta tu cuenta de GitHub desde tu perfil y volve a intentar.",
+      reintentable: false,
+      // Sin handle no hay perfil al que mandar: ahi queda solo el texto.
+      ...(propio ? { perfilHref: `/u/${propio}` } : {}),
     };
   }
 
   const resultado = await listPublicRepos(handle);
 
   if (!resultado.ok) {
-    const mensajes = {
-      "no-existe": `No encontramos la cuenta @${handle} en GitHub.`,
-      limite: "GitHub nos pidio esperar un momento. Proba de nuevo en unos minutos.",
-      "sin-respuesta": "No pudimos hablar con GitHub. Proba de nuevo en un rato.",
+    /*
+     * Cada fallo con su salida: reintentar solo se ofrece donde puede cambiar
+     * algo. Ante un token nuestro vencido, insistir no arregla nada y decir
+     * "proba de nuevo" seria mandar a la persona a chocar contra la misma
+     * pared; lo que corresponde es que siga a mano.
+     */
+    const salidas = {
+      "no-existe": {
+        message: `No encontramos la cuenta @${handle} en GitHub.`,
+        reintentable: false,
+      },
+      limite: {
+        message: "GitHub nos pidio esperar un momento. Proba de nuevo en unos minutos.",
+        reintentable: true,
+      },
+      credencial: {
+        message:
+          "Esto es un problema nuestro, no tuyo, y ya quedo avisado. Mientras lo arreglamos podes llenar el formulario a mano.",
+        reintentable: false,
+      },
+      "sin-respuesta": {
+        message: "No pudimos hablar con GitHub. Proba de nuevo en un rato.",
+        reintentable: true,
+      },
     };
-    return { ok: false, message: mensajes[resultado.reason] };
+    return { ok: false, ...salidas[resultado.reason] };
   }
 
   // Cuales ya estan publicados, para no ofrecer un duplicado.
