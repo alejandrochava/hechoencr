@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { LoginPanel } from "@/components/auth/login-panel";
 import { RegisterPanel } from "@/components/auth/register-panel";
 import { Modal } from "@/components/ui/modal";
+import type { OAuthProvider } from "@/lib/supabase/providers";
 
 type AuthModalContext = {
   /** `next` es a donde vuelve la persona despues de entrar. */
@@ -25,9 +26,12 @@ export function useAuthModal() {
 export function AuthModalProvider({
   children,
   authenticated,
+  providers,
 }: {
   children: ReactNode;
   authenticated: boolean;
+  /** Los proveedores de OAuth encendidos hoy en Supabase. */
+  providers: OAuthProvider[];
 }) {
   /*
    * El `id` sube en cada apertura. Sin el, pedir el login dos veces con el
@@ -68,7 +72,11 @@ export function AuthModalProvider({
         }
       >
         {mode === "entrar" ? (
-          <LoginPanel next={request?.next ?? "/"} onRegister={() => setMode("registro")} />
+          <LoginPanel
+            next={request?.next ?? "/"}
+            providers={providers}
+            onRegister={() => setMode("registro")}
+          />
         ) : (
           <RegisterPanel next={request?.next ?? "/"} onHaveAccount={() => setMode("entrar")} />
         )}

@@ -6,6 +6,7 @@ import { ProfileVisibility } from "@/components/profile-visibility";
 import { ProjectCard } from "@/components/project-card";
 import { Container } from "@/components/ui/primitives";
 import { getProfileByHandle, getProjectsByOwner, getVotedIds } from "@/lib/queries";
+import { enabledProviders } from "@/lib/supabase/providers";
 import { getCurrentUser } from "@/lib/supabase/server";
 
 export async function generateMetadata({ params }: PageProps<"/u/[handle]">): Promise<Metadata> {
@@ -33,9 +34,10 @@ export default async function ProfilePage({ params }: PageProps<"/u/[handle]">) 
   const profile = await getProfileByHandle(handle);
   if (!profile) notFound();
 
-  const [projects, viewer] = await Promise.all([
+  const [projects, viewer, providers] = await Promise.all([
     getProjectsByOwner(profile.id),
     getCurrentUser(),
+    enabledProviders(),
   ]);
   const voted = await getVotedIds(projects.map((project) => project.id));
   const isMe = viewer?.id === profile.id;
@@ -84,7 +86,7 @@ export default async function ProfilePage({ params }: PageProps<"/u/[handle]">) 
                 </svg>
                 @{profile.github_handle}
               </a>
-            ) : isMe ? (
+            ) : isMe && providers.includes("github") ? (
               <GithubLink />
             ) : null}
           </div>

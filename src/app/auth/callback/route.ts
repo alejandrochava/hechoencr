@@ -29,5 +29,7 @@ export async function GET(request: NextRequest) {
     console.error("auth/callback:", error.message);
   }
 
-  return NextResponse.redirect(`${origin}/entrar?error=1`);
+  // /entrar es un atajo que el proxy convierte en el modal sobre `next`.
+  const failure = new URLSearchParams({ auth_error: "1", next });
+  return NextResponse.redirect(`${origin}/entrar?${failure}`);
 }

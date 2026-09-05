@@ -7,9 +7,11 @@ import { LoginQueryOpener } from "@/components/auth/login-trigger";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { themeScript } from "@/components/theme-toggle";
+import { ToastOnParam } from "@/components/toast-on-param";
 import { ToastProvider } from "@/components/ui/toast";
 import { site } from "@/lib/site";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { enabledProviders } from "@/lib/supabase/providers";
 import { getCurrentUser } from "@/lib/supabase/server";
 
 import "./globals.css";
@@ -30,7 +32,10 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const user = isSupabaseConfigured ? await getCurrentUser() : null;
+  const [user, providers] = await Promise.all([
+    isSupabaseConfigured ? getCurrentUser() : null,
+    enabledProviders(),
+  ]);
 
   return (
     <html
@@ -44,9 +49,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="flex min-h-full flex-col antialiased">
         <ToastProvider>
-          <AuthModalProvider authenticated={Boolean(user)}>
+          <AuthModalProvider authenticated={Boolean(user)} providers={providers}>
             <Suspense fallback={null}>
               <LoginQueryOpener />
+              <ToastOnParam
+                param="auth_error"
+                message="No pudimos completar el ingreso. Proba de nuevo."
+              />
             </Suspense>
             <SiteHeader />
             <main className="flex-1">{children}</main>

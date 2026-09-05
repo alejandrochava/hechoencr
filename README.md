@@ -89,6 +89,10 @@ usan las de Supabase.
    **URL Configuration** agrega `http://localhost:3000/auth/callback` como redirect.
    El acceso por correo (magic link) ya funciona sin configurar nada.
 
+   Los botones de GitHub y Google solo aparecen si el proveedor esta encendido:
+   el sitio le pregunta a Supabase cuales acepta. Encenderlos es una casilla del
+   panel, no un despliegue.
+
 5. Corre el sitio:
 
    ```bash

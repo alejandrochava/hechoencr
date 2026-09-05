@@ -54,8 +54,15 @@ export async function proxy(request: NextRequest) {
   if (pathname === "/entrar") {
     const url = request.nextUrl.clone();
     url.pathname = "/";
+
+    const params = new URLSearchParams({ login: "1" });
     const next = searchParams.get("next");
-    url.search = next ? `?login=1&next=${encodeURIComponent(next)}` : "?login=1";
+    if (next) params.set("next", next);
+    // Si el ingreso fallo, el aviso viaja hasta el destino; sin el, el modal se
+    // reabre sin decir nada y parece que el boton no hizo nada.
+    if (searchParams.get("auth_error")) params.set("auth_error", "1");
+
+    url.search = `?${params}`;
     return NextResponse.redirect(url);
   }
 
