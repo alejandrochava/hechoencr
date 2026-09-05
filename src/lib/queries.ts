@@ -12,6 +12,9 @@ import type {
 
 export const PAGE_SIZE = 24;
 
+/** Un sitemap admite 50 000 URL; con este tope entra de sobra y no se desborda. */
+const SITEMAP_LIMIT = 5000;
+
 export type FeedParams = {
   sort: SortKey;
   tag?: string;
@@ -209,4 +212,46 @@ export async function getMessages(): Promise<ContactMessage[]> {
     return [];
   }
   return (data ?? []) as ContactMessage[];
+}
+
+/**
+ * Todo lo que va en el sitemap: las fichas publicadas y los perfiles publicos.
+ *
+ * Los filtros van explicitos aunque la RLS ya los aplique. Aca la consulta sale
+ * sin sesion —la hace un buscador—, asi que depender de la politica dejaria el
+ * sitemap a merced de un cambio en el schema; y `public_profile` no lo filtra
+ * ninguna politica, lo respeta la aplicacion.
+ */
+export async function getSitemapEntries(): Promise<{
+  projects: { slug: string; updated_at: string }[];
+  handles: string[];
+}> {
+  if (!isSupabaseConfigured) return { projects: [], handles: [] };
+
+  const supabase = await createClient();
+
+  const [projects, profiles] = await Promise.all([
+    supabase
+      .from("projects")
+      .select("slug, updated_at")
+      .eq("status", "published")
+      .order("updated_at", { ascending: false })
+      .limit(SITEMAP_LIMIT),
+    supabase
+      .from("profiles")
+      .select("handle")
+      .eq("public_profile", true)
+      .not("handle", "is", null)
+      .limit(SITEMAP_LIMIT),
+  ]);
+
+  if (projects.error) console.error("getSitemapEntries proyectos:", projects.error.message);
+  if (profiles.error) console.error("getSitemapEntries perfiles:", profiles.error.message);
+
+  return {
+    projects: (projects.data ?? []) as { slug: string; updated_at: string }[],
+    handles: ((profiles.data ?? []) as { handle: string | null }[]).flatMap((row) =>
+      row.handle ? [row.handle] : [],
+    ),
+  };
 }

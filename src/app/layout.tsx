@@ -28,7 +28,11 @@ export const metadata: Metadata = {
     description: site.description,
     locale: "es_CR",
     type: "website",
+    siteName: site.name,
+    url: site.url,
   },
+  // Sin esto X muestra la tarjeta chica, con la imagen recortada a un cuadro.
+  twitter: { card: "summary_large_image", title: site.name, description: site.description },
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
