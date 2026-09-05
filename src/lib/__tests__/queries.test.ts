@@ -17,7 +17,12 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => dobles.cliente,
   // El modulo real lo envuelve en el cache de React, que fuera de un render no
   // existe; aca alcanza con preguntarle al cliente falso lo mismo.
-  getCurrentUser: async () => (await dobles.cliente.auth.getUser()).data.user,
+  getCurrentUser: async () => {
+    const cliente = dobles.cliente as {
+      auth: { getUser: () => Promise<{ data: { user: unknown } }> };
+    };
+    return (await cliente.auth.getUser()).data.user;
+  },
 }));
 
 // Un getter y no un valor: hay una prueba que necesita el proyecto sin
