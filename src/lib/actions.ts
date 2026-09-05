@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { checkProjectLinks, checkRepo, checkSite } from "@/lib/link-check";
 import { findPreviewImage } from "@/lib/preview";
+import { isCurrentUserAdmin } from "@/lib/queries";
 import { TAG_VALUES } from "@/lib/site";
 import { domainAcceptsMail } from "@/lib/email";
 import { notifyNewMessage } from "@/lib/mailer";
@@ -19,6 +20,7 @@ import {
   normalizeUrl,
   sanitizeProjectLinks,
   slugify,
+  type ProjectLink,
 } from "@/lib/text";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/types";
@@ -49,6 +51,9 @@ export async function toggleVote(projectId: string, slug?: string) {
   if (slug) revalidatePath(`/p/${slug}`);
 }
 
+/** Tope de categorias por proyecto; el formulario muestra el mismo numero. */
+const MAX_TAGS = 3;
+
 /** Motivo por el que un enlace extra no pasa, en corto: van todos en una linea. */
 const LINK_REASONS = {
   invalida: "no es una direccion valida",
@@ -57,24 +62,41 @@ const LINK_REASONS = {
   "sin-https": "no carga por https",
 } as const;
 
-export async function submitProject(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+type ProjectValues = {
+  name: string;
+  tagline: string;
+  description: string;
+  url: string;
+  repoUrl: string | null;
+  links: ProjectLink[];
+  tags: string[];
+};
 
-  if (!user) return { error: "necesita-sesion" };
+type ProjectCheck =
+  | { ok: false; fields: Record<string, string> }
+  | { ok: true; values: ProjectValues };
 
+/**
+ * Lee y valida el formulario de un proyecto, para publicar y para editar.
+ *
+ * Esta junto a proposito: si las dos pantallas validaran por su cuenta, un dia
+ * se podria editar un proyecto para dejarle un enlace que al publicarlo no
+ * habria pasado.
+ *
+ * Los errores salen por campo porque el formulario va con noValidate: no
+ * aparece el globo del navegador y el mensaje se lee en espanol, debajo del
+ * campo que corresponde.
+ */
+async function checkProjectForm(formData: FormData): Promise<ProjectCheck> {
   const name = String(formData.get("name") ?? "").trim();
   const tagline = String(formData.get("tagline") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const url = normalizeUrl(String(formData.get("url") ?? ""));
   const repoUrl = normalizeUrl(String(formData.get("repo_url") ?? ""));
-  const isMine = formData.get("is_mine") === "on";
 
   // Los enlaces extra viajan como JSON en un campo oculto; la forma la
   // garantiza sanitizeProjectLinks, no el navegador.
-  let links: ReturnType<typeof sanitizeProjectLinks> = [];
+  let links: ProjectLink[] = [];
   try {
     links = sanitizeProjectLinks(JSON.parse(String(formData.get("links") ?? "[]")));
   } catch {
@@ -85,11 +107,8 @@ export async function submitProject(_prev: ActionState, formData: FormData): Pro
     .getAll("tags")
     .map(String)
     .filter((tag) => TAG_VALUES.includes(tag))
-    .slice(0, 3);
+    .slice(0, MAX_TAGS);
 
-  // Validamos aca y devolvemos el error por campo: el formulario va con
-  // noValidate, asi que no aparece el globo del navegador y el mensaje sale
-  // en espanol, debajo del campo que corresponde.
   const fields: Record<string, string> = {};
   if (name.length < 2) fields.name = "Escribi al menos dos caracteres.";
   if (name.length > 60) fields.name = "Maximo 60 caracteres.";
@@ -99,14 +118,12 @@ export async function submitProject(_prev: ActionState, formData: FormData): Pro
   if (description.length > 4000) fields.description = "Maximo 4000 caracteres.";
   if (tags.length === 0) fields.tags = "Elegi al menos una categoria.";
 
-  if (Object.keys(fields).length > 0) {
-    return { error: "Revisa los campos marcados.", fields };
-  }
+  if (Object.keys(fields).length > 0) return { ok: false, fields };
 
   /*
    * Recien aca se toca la red: primero lo que se resuelve gratis, y solo si
-   * eso pasa se le pregunta al sitio y a la forja. Las dos consultas van en
-   * paralelo porque no dependen entre si.
+   * eso pasa se le pregunta al sitio, a la forja y a cada enlace extra. Van en
+   * paralelo porque no dependen entre si, asi que el costo es el del mas lento.
    */
   const [site, repo, checkedLinks] = await Promise.all([
     checkSite(url),
@@ -120,8 +137,8 @@ export async function submitProject(_prev: ActionState, formData: FormData): Pro
     entry.check.ok ? [] : [{ label: entry.link.label, reason: entry.check.reason }],
   );
 
-  // Los dos errores se devuelven juntos: si no, se arregla uno, se reenvia y
-  // aparece el otro.
+  // Los errores vuelven juntos: si no, se arregla uno, se reenvia y aparece el
+  // siguiente.
   if (!site.ok || repo?.ok === false || brokenLinks.length > 0) {
     if (!site.ok) {
       fields.url = {
@@ -150,17 +167,41 @@ export async function submitProject(_prev: ActionState, formData: FormData): Pro
       fields.links = `Revisa estos enlaces: ${detail}.`;
     }
 
-    return { error: "Revisa los campos marcados.", fields };
+    return { ok: false, fields };
   }
 
-  // Se guarda lo comprobado: la URL con https resuelto y el repo canonico, sin
-  // .git ni la subruta que venia pegada de la barra de direcciones.
-  const finalUrl = site.url;
-  const finalRepoUrl = repo?.ok ? repo.ref.url : null;
-  const finalLinks = checkedLinks.map((entry) => ({
-    ...entry.link,
-    url: entry.check.ok ? entry.check.url : entry.link.url,
-  }));
+  return {
+    ok: true,
+    values: {
+      name,
+      tagline,
+      description,
+      // Lo comprobado: la URL con https resuelto y el repo canonico, sin .git
+      // ni la subruta que venia pegada de la barra de direcciones.
+      url: site.url,
+      repoUrl: repo?.ok ? repo.ref.url : null,
+      links: checkedLinks.map((entry) => ({
+        ...entry.link,
+        url: entry.check.ok ? entry.check.url : entry.link.url,
+      })),
+      tags,
+    },
+  };
+}
+
+export async function submitProject(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "necesita-sesion" };
+
+  const checked = await checkProjectForm(formData);
+  if (!checked.ok) return { error: "Revisa los campos marcados.", fields: checked.fields };
+
+  const { name, tagline, description, url, repoUrl, links, tags } = checked.values;
+  const isMine = formData.get("is_mine") === "on";
 
   const base = slugify(name) || "proyecto";
   let slug = base;
@@ -172,17 +213,17 @@ export async function submitProject(_prev: ActionState, formData: FormData): Pro
 
   // La vista previa se busca antes de insertar para que la tarjeta ya nazca
   // con imagen; si el sitio no responde, findPreviewImage devuelve el fallback.
-  const imageUrl = await findPreviewImage(finalUrl);
+  const imageUrl = await findPreviewImage(url);
 
   const { error } = await supabase.from("projects").insert({
     slug,
     name,
     tagline,
     description: description || null,
-    url: finalUrl,
-    repo_url: finalRepoUrl,
+    url,
+    repo_url: repoUrl,
     image_url: imageUrl,
-    links: finalLinks,
+    links,
     tags,
     submitted_by: user.id,
     // Si lo publica su propio autor queda reclamado de una vez.
@@ -196,6 +237,78 @@ export async function submitProject(_prev: ActionState, formData: FormData): Pro
 
   revalidatePath("/");
   redirect(`/p/${slug}?publicado=1`);
+}
+
+/**
+ * Edita un proyecto ya publicado. Solo su dueno, o un admin.
+ *
+ * El slug no cambia aunque cambie el nombre: la URL es la identidad del
+ * proyecto y ya puede estar compartida, en el sitemap o indexada. Renombrar no
+ * deberia romper un enlace que alguien mando por WhatsApp hace un mes.
+ *
+ * La autorizacion de verdad la hace la RLS (politica "solo el duenno edita").
+ * La comprobacion de aca es para poder decir que paso: sin ella, un update sin
+ * permiso afecta cero filas y Supabase no lo reporta como error, asi que se
+ * veria como si se hubiera guardado.
+ */
+export async function updateProject(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: "necesita-sesion" };
+
+  const slug = String(formData.get("slug") ?? "").trim();
+  if (!slug) return { error: "No sabemos que proyecto estas editando." };
+
+  const { data: current, error: readError } = await supabase
+    .from("projects")
+    .select("id, url, owner_id")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (readError) {
+    console.error("updateProject lectura:", readError.message);
+    return { error: "No se pudo cargar el proyecto. Intenta de nuevo." };
+  }
+  if (!current) return { error: "Ese proyecto no existe." };
+
+  if (current.owner_id !== user.id && !(await isCurrentUserAdmin())) {
+    return { error: "Este proyecto no esta a tu nombre." };
+  }
+
+  const checked = await checkProjectForm(formData);
+  if (!checked.ok) return { error: "Revisa los campos marcados.", fields: checked.fields };
+
+  const { name, tagline, description, url, repoUrl, links, tags } = checked.values;
+
+  // La vista previa solo se rehace si cambio el enlace: es una peticion a un
+  // sitio ajeno y corregir una coma en la descripcion no la necesita.
+  const imageUrl = url === current.url ? undefined : await findPreviewImage(url);
+
+  const { error } = await supabase
+    .from("projects")
+    .update({
+      name,
+      tagline,
+      description: description || null,
+      url,
+      repo_url: repoUrl,
+      links,
+      tags,
+      ...(imageUrl === undefined ? {} : { image_url: imageUrl }),
+    })
+    .eq("id", current.id);
+
+  if (error) {
+    console.error("updateProject:", error.message);
+    return { error: "No se pudieron guardar los cambios. Intenta de nuevo." };
+  }
+
+  revalidatePath(`/p/${slug}`);
+  revalidatePath("/");
+  redirect(`/p/${slug}?guardado=1`);
 }
 
 /**

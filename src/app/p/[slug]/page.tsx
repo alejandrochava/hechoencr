@@ -7,11 +7,11 @@ import { ClaimForm } from "@/components/claim-form";
 import { PersonLine } from "@/components/person-line";
 import { ProjectPreview } from "@/components/project-preview";
 import { ToastOnParam } from "@/components/toast-on-param";
-import { ButtonAnchor } from "@/components/ui/button";
+import { ButtonAnchor, ButtonLink } from "@/components/ui/button";
 import { Container, DataRow, Tag } from "@/components/ui/primitives";
 import { VoteButton } from "@/components/vote-button";
 import { getMyClaimStatus, getProject, getVotedIds } from "@/lib/queries";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { tagLabel } from "@/lib/site";
 import { hostOf } from "@/lib/url";
@@ -43,10 +43,13 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
   const project = await getProject(slug);
   if (!project) notFound();
 
-  const [voted, claimStatus] = await Promise.all([
+  const [voted, claimStatus, viewer] = await Promise.all([
     getVotedIds([project.id]),
     getMyClaimStatus(project.id),
+    getCurrentUser(),
   ]);
+
+  const isOwner = Boolean(viewer && project.owner?.id === viewer.id);
 
   if (isSupabaseConfigured) {
     const supabase = await createClient();
@@ -57,6 +60,7 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
     <Container width="content" className="animate-fade py-8">
       <Suspense fallback={null}>
         <ToastOnParam param="publicado" message="Proyecto publicado." />
+        <ToastOnParam param="guardado" message="Cambios guardados." />
       </Suspense>
 
 
@@ -171,7 +175,14 @@ export default async function ProjectPage({ params }: PageProps<"/p/[slug]">) {
 
           <div className="mt-8 space-y-5 border-t border-border/70 pt-6">
             {project.owner ? (
-              <PersonLine person={project.owner} role="Autor verificado" />
+              <>
+                <PersonLine person={project.owner} role="Autor verificado" />
+                {isOwner ? (
+                  <ButtonLink href={`/p/${project.slug}/editar`} size="sm">
+                    Editar la ficha
+                  </ButtonLink>
+                ) : null}
+              </>
             ) : (
               <ClaimForm
                 projectId={project.id}

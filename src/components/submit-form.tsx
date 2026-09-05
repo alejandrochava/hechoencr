@@ -3,39 +3,17 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import { useAuthModal } from "@/components/auth/auth-modal";
+import { EMPTY_DRAFT, ProjectFields, type ProjectDraft } from "@/components/project-fields";
 import { Button } from "@/components/ui/button";
-import { LinkFields } from "@/components/link-fields";
-import { Field, Input, Textarea } from "@/components/ui/field";
 import { submitProject } from "@/lib/actions";
-import { cn } from "@/lib/cn";
-import { TAGS } from "@/lib/site";
-import type { ProjectLink } from "@/lib/text";
 import type { ActionState } from "@/lib/types";
 
-const MAX_TAGS = 3;
 const DRAFT_KEY = "borrador-proyecto";
 
-type Draft = {
-  links: ProjectLink[];
-  name: string;
-  tagline: string;
-  url: string;
-  repo_url: string;
-  description: string;
-  tags: string[];
-  is_mine: boolean;
-};
+/** Lo del proyecto, mas lo que solo existe al publicar. */
+type Draft = ProjectDraft & { is_mine: boolean };
 
-const EMPTY: Draft = {
-  links: [],
-  name: "",
-  tagline: "",
-  url: "",
-  repo_url: "",
-  description: "",
-  tags: [],
-  is_mine: true,
-};
+const EMPTY: Draft = { ...EMPTY_DRAFT, is_mine: true };
 
 function readDraft(): Draft | null {
   try {
@@ -65,15 +43,8 @@ export function SubmitForm({ authenticated }: { authenticated: boolean }) {
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
-  function toggleTag(tag: string) {
-    update(
-      "tags",
-      draft.tags.includes(tag)
-        ? draft.tags.filter((item) => item !== tag)
-        : draft.tags.length < MAX_TAGS
-          ? [...draft.tags, tag]
-          : draft.tags,
-    );
+  function patch(changes: Partial<ProjectDraft>) {
+    setDraft((current) => ({ ...current, ...changes }));
   }
 
   function saveDraft() {
@@ -133,122 +104,7 @@ export function SubmitForm({ authenticated }: { authenticated: boolean }) {
       noValidate
       className="mt-10 space-y-7"
     >
-      <Field label="Nombre del proyecto" htmlFor="name" error={errors.name}>
-        <Input
-          id="name"
-          name="name"
-          value={draft.name}
-          onChange={(event) => update("name", event.target.value)}
-          invalid={Boolean(errors.name)}
-          placeholder="Consulta de Placas"
-        />
-      </Field>
-
-      <Field
-        label="En una linea"
-        htmlFor="tagline"
-        error={errors.tagline}
-        support={`${draft.tagline.length}/140 · es lo que se lee en la lista`}
-      >
-        <Input
-          id="tagline"
-          name="tagline"
-          maxLength={140}
-          value={draft.tagline}
-          onChange={(event) => update("tagline", event.target.value)}
-          invalid={Boolean(errors.tagline)}
-          placeholder="Escribis la placa y te devuelve el historial del vehiculo."
-        />
-      </Field>
-
-      <Field
-        label="Enlace"
-        htmlFor="url"
-        error={errors.url}
-        support="El sitio donde la gente lo puede usar. Tiene que estar arriba y cargar por https."
-      >
-        <Input
-          id="url"
-          name="url"
-          value={draft.url}
-          onChange={(event) => update("url", event.target.value)}
-          invalid={Boolean(errors.url)}
-          placeholder="https://tuproyecto.cr"
-        />
-      </Field>
-
-      <Field
-        label="Repositorio"
-        htmlFor="repo_url"
-        optional
-        error={errors.repo_url}
-        support="GitHub, GitLab, Bitbucket, Codeberg o SourceHut. Si el repo esta en tu cuenta de GitHub, podes verificar el proyecto al instante."
-      >
-        <Input
-          id="repo_url"
-          name="repo_url"
-          value={draft.repo_url}
-          onChange={(event) => update("repo_url", event.target.value)}
-          invalid={Boolean(errors.repo_url)}
-          placeholder="https://github.com/usuario/repo"
-        />
-      </Field>
-
-      <Field
-        label="Descripcion"
-        htmlFor="description"
-        optional
-        error={errors.description}
-        support="Que hace, para quien es, que lo hace distinto."
-      >
-        <Textarea
-          id="description"
-          name="description"
-          rows={5}
-          maxLength={4000}
-          className="w-full"
-          value={draft.description}
-          onChange={(event) => update("description", event.target.value)}
-          invalid={Boolean(errors.description)}
-        />
-      </Field>
-
-      <LinkFields
-        links={draft.links}
-        onChange={(next) => update("links", next)}
-        error={errors.links}
-      />
-
-      <fieldset>
-        <legend className="text-sm font-medium">Categorias</legend>
-        <p className={cn("mt-1 text-xs", errors.tags ? "text-flag" : "text-muted")}>
-          {errors.tags ?? `Elegi hasta ${MAX_TAGS}.`}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {TAGS.map((tag) => {
-            const active = draft.tags.includes(tag.value);
-            return (
-              <button
-                type="button"
-                key={tag.value}
-                onClick={() => toggleTag(tag.value)}
-                aria-pressed={active}
-                className={cn(
-                  "rounded-full px-3.5 py-2 text-[13px] font-medium transition-colors duration-200 ease-brand",
-                  active
-                    ? "bg-accent-soft text-accent-strong"
-                    : "bg-surface-2 text-muted hover:text-text",
-                )}
-              >
-                {tag.label}
-              </button>
-            );
-          })}
-        </div>
-        {draft.tags.map((tag) => (
-          <input key={tag} type="hidden" name="tags" value={tag} />
-        ))}
-      </fieldset>
+      <ProjectFields draft={draft} errors={errors} onChange={patch} />
 
       <label className="flex items-start gap-3 rounded-card border border-border p-4">
         <input
