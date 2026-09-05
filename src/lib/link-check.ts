@@ -7,6 +7,7 @@ import {
   isPrivateAddress,
   isPublicHttpUrl,
   repoRef,
+  type ProjectLink,
   type RepoRef,
 } from "@/lib/text";
 
@@ -85,10 +86,17 @@ async function request(url: string): Promise<Respuesta> {
     // como que el proyecto no existe.
     if (response.status === 404 || response.status === 410) return { tipo: "no-existe" };
 
-    // El redirect puede terminar en la red interna aunque el origen fuera publico.
+    // El redirect puede terminar en la red interna aunque el origen fuera
+    // publico, asi que el destino final igual se revisa.
     if (!isPublicHttpUrl(response.url || url)) return { tipo: "no-existe" };
 
-    return { tipo: "ok", url: response.url || url };
+    /*
+     * Se devuelve la URL que pedimos, no `response.url`. Seguimos los redirects
+     * para comprobar, pero guardar el destino final cambiaria el enlace por
+     * detras: un sitio que manda de https://proyecto.cr a /es/inicio dejaria
+     * guardada la ruta con el idioma pegado, y no es lo que escribieron.
+     */
+    return { tipo: "ok", url };
   } catch (error) {
     const code = String((error as { cause?: NodeJS.ErrnoException }).cause?.code ?? "");
     if (TLS_FALLA.has(code)) return { tipo: "tls" };
@@ -162,4 +170,18 @@ export async function checkRepo(raw: string): Promise<RepoCheck> {
 
   // Timeout o TLS de la forja es problema nuestro o suyo, no del repositorio.
   return { ok: true, ref };
+}
+
+/**
+ * Revisa los enlaces extra con la misma vara que el principal.
+ *
+ * Van todos en paralelo: son pocos (MAX_PROJECT_LINKS) y no dependen entre si,
+ * asi que el costo es el del enlace mas lento, no la suma.
+ */
+export async function checkProjectLinks(
+  links: ProjectLink[],
+): Promise<{ link: ProjectLink; check: SiteCheck }[]> {
+  return Promise.all(
+    links.map(async (link) => ({ link, check: await checkSite(link.url) })),
+  );
 }

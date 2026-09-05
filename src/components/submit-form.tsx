@@ -213,7 +213,11 @@ export function SubmitForm({ authenticated }: { authenticated: boolean }) {
         />
       </Field>
 
-      <LinkFields links={draft.links} onChange={(next) => update("links", next)} />
+      <LinkFields
+        links={draft.links}
+        onChange={(next) => update("links", next)}
+        error={errors.links}
+      />
 
       <fieldset>
         <legend className="text-sm font-medium">Categorias</legend>

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { checkRepo, checkSite } from "@/lib/link-check";
+import { checkProjectLinks, checkRepo, checkSite } from "@/lib/link-check";
 import { findPreviewImage } from "@/lib/preview";
 import { TAG_VALUES } from "@/lib/site";
 import { domainAcceptsMail } from "@/lib/email";
@@ -48,6 +48,14 @@ export async function toggleVote(projectId: string, slug?: string) {
   revalidatePath("/");
   if (slug) revalidatePath(`/p/${slug}`);
 }
+
+/** Motivo por el que un enlace extra no pasa, en corto: van todos en una linea. */
+const LINK_REASONS = {
+  invalida: "no es una direccion valida",
+  privada: "no apunta a un sitio publico",
+  "no-existe": "no responde",
+  "sin-https": "no carga por https",
+} as const;
 
 export async function submitProject(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const supabase = await createClient();
@@ -100,14 +108,21 @@ export async function submitProject(_prev: ActionState, formData: FormData): Pro
    * eso pasa se le pregunta al sitio y a la forja. Las dos consultas van en
    * paralelo porque no dependen entre si.
    */
-  const [site, repo] = await Promise.all([
+  const [site, repo, checkedLinks] = await Promise.all([
     checkSite(url),
     repoUrl ? checkRepo(repoUrl) : Promise.resolve(null),
+    checkProjectLinks(links),
   ]);
+
+  // flatMap y no filter: adentro del callback TypeScript si estrecha el union
+  // y deja leer el motivo sin un predicado de tipo a mano.
+  const brokenLinks = checkedLinks.flatMap((entry) =>
+    entry.check.ok ? [] : [{ label: entry.link.label, reason: entry.check.reason }],
+  );
 
   // Los dos errores se devuelven juntos: si no, se arregla uno, se reenvia y
   // aparece el otro.
-  if (!site.ok || repo?.ok === false) {
+  if (!site.ok || repo?.ok === false || brokenLinks.length > 0) {
     if (!site.ok) {
       fields.url = {
         invalida: "Revisa el enlace: tiene que ser una direccion web valida.",
@@ -126,6 +141,15 @@ export async function submitProject(_prev: ActionState, formData: FormData): Pro
           : "Ese repositorio no existe o es privado.";
     }
 
+    if (brokenLinks.length > 0) {
+      // Se nombran por su etiqueta, que es como los escribio quien publica, y
+      // en una sola linea: son hasta MAX_PROJECT_LINKS y no tienen campo propio.
+      const detail = brokenLinks
+        .map((broken) => `${broken.label} (${LINK_REASONS[broken.reason]})`)
+        .join(", ");
+      fields.links = `Revisa estos enlaces: ${detail}.`;
+    }
+
     return { error: "Revisa los campos marcados.", fields };
   }
 
@@ -133,6 +157,10 @@ export async function submitProject(_prev: ActionState, formData: FormData): Pro
   // .git ni la subruta que venia pegada de la barra de direcciones.
   const finalUrl = site.url;
   const finalRepoUrl = repo?.ok ? repo.ref.url : null;
+  const finalLinks = checkedLinks.map((entry) => ({
+    ...entry.link,
+    url: entry.check.ok ? entry.check.url : entry.link.url,
+  }));
 
   const base = slugify(name) || "proyecto";
   let slug = base;
@@ -154,7 +182,7 @@ export async function submitProject(_prev: ActionState, formData: FormData): Pro
     url: finalUrl,
     repo_url: finalRepoUrl,
     image_url: imageUrl,
-    links,
+    links: finalLinks,
     tags,
     submitted_by: user.id,
     // Si lo publica su propio autor queda reclamado de una vez.

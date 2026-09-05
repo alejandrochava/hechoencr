@@ -11,9 +11,12 @@ import { MAX_PROJECT_LINKS, type ProjectLink } from "@/lib/text";
 export function LinkFields({
   links,
   onChange,
+  error,
 }: {
   links: ProjectLink[];
   onChange: (next: ProjectLink[]) => void;
+  /** Lo que el servidor encontro mal; nombra los enlaces por su etiqueta. */
+  error?: string;
 }) {
   function update(index: number, patch: Partial<ProjectLink>) {
     onChange(links.map((link, i) => (i === index ? { ...link, ...patch } : link)));
@@ -57,6 +60,12 @@ export function LinkFields({
           </div>
         ))}
       </div>
+
+      {error ? (
+        <p role="alert" className="mt-2 text-xs leading-relaxed text-flag">
+          {error}
+        </p>
+      ) : null}
 
       {links.length < MAX_PROJECT_LINKS ? (
         <Button
