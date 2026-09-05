@@ -128,7 +128,7 @@ arranca sin las dos ultimas.
 3. Importa el repositorio en Vercel y define las variables de `.env.example`.
    Las `NEXT_PUBLIC_*` se incrustan al compilar; el resto son solo del servidor.
 4. Para que el despliegue automatico funcione, agrega en **Settings → Secrets →
-   Actions** del repositorio: `VERCEL_TOKEN`, `VERCEL_ORG_ID`,
+   Actions** del repositorio: `VERCEL_TOKEN_HECHOENCR`, `VERCEL_ORG_ID`,
    `VERCEL_PROJECT_ID` y las tres `NEXT_PUBLIC_*`.
 5. Un push a `produccion` publica, siempre que lint, tests y build queden en
    verde.

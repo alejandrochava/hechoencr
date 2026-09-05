@@ -41,9 +41,17 @@ jobs:
           cache: npm
 
       - name: Desplegar a Vercel
-        # Requiere los secrets VERCEL_TOKEN, VERCEL_ORG_ID y VERCEL_PROJECT_ID
-        # en Settings > Secrets > Actions del repositorio.
+        # Requiere los secrets VERCEL_TOKEN_HECHOENCR, VERCEL_ORG_ID y
+        # VERCEL_PROJECT_ID en Settings > Secrets > Actions del repositorio.
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: npx vercel@latest deploy --prod --yes --token "${{ secrets.VERCEL_TOKEN }}"
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN_HECHOENCR }}
+        # Si el secret falta, `--token` se queda sin valor y el error que da
+        # Vercel no dice cual es. Mejor fallar aca, diciendolo.
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "Falta el secret VERCEL_TOKEN_HECHOENCR en el repositorio." >&2
+            exit 1
+          fi
+          npx vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN"
