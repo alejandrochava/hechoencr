@@ -114,6 +114,10 @@ export async function listPublicRepos(handle: string): Promise<ReposResult> {
       // quien esta del otro lado el consejo es el mismo: esperar.
       resultado = { ok: false, reason: "limite" };
     } else if (!response.ok) {
+      // Un token vencido o mal pegado da 401 y cae aca: sin esta linea, el
+      // fallo llega al navegador como "no pudimos hablar con GitHub" y en el
+      // servidor no queda nada que mirar.
+      console.error(`listPublicRepos: GitHub respondio ${response.status} para @${cuenta}`);
       resultado = { ok: false, reason: "sin-respuesta" };
     } else {
       const crudos = (await response.json()) as unknown;
@@ -128,7 +132,8 @@ export async function listPublicRepos(handle: string): Promise<ReposResult> {
 
       resultado = { ok: true, repos };
     }
-  } catch {
+  } catch (error) {
+    console.error(`listPublicRepos: fallo la consulta a GitHub para @${cuenta}:`, error);
     resultado = { ok: false, reason: "sin-respuesta" };
   }
 
