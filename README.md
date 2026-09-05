@@ -52,8 +52,8 @@ docker compose up -d --build
 - Base de datos: `postgres://postgres:postgres@localhost:54322/postgres`
 
 El servicio `migrate` aplica `supabase/schema.sql`, los permisos y los datos de
-ejemplo la primera vez. Para entrar, pedi un enlace desde `/entrar` y abrilo
-desde Mailpit. Para volverte admin:
+ejemplo la primera vez. Para entrar, abri el modal de acceso desde el boton del
+encabezado, pedi el enlace y abrilo desde Mailpit. Para volverte admin:
 
 ```bash
 docker compose exec db psql -U postgres -c "update profiles set is_admin = true where handle = 'tu-usuario';"
@@ -171,7 +171,7 @@ valida siempre del lado del servidor, aunque el navegador ya los haya filtrado.
 
 **Seguridad.** Todo pasa por Row Level Security en Postgres. La llave publica del cliente
 no puede leer ni escribir nada que las policies no permitan, incluso si alguien llama la
-API directo.
+API directo. Para reportar un problema, mira [SECURITY.md](SECURITY.md).
 
 ## Estructura
 
@@ -181,10 +181,10 @@ src/
     page.tsx              feed con pestanas, busqueda y filtro por categoria
     p/[slug]/page.tsx     ficha del proyecto
     publicar/page.tsx     formulario para publicar
-    entrar/page.tsx       login (GitHub, Google, magic link)
     admin/reclamos/       cola de reclamos para admins
     auth/callback/        intercambio del code de OAuth por sesion
   components/             UI (tarjeta, boton de voto, filtros, formularios)
+    auth/                 login en modal (GitHub, Google, magic link)
   lib/
     site.ts               marca, categorias y modos de orden
     queries.ts            lecturas
