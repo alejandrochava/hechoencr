@@ -31,23 +31,35 @@ export function LinkFields({
 
       <div className="mt-3 space-y-2">
         {links.map((link, index) => (
+          /*
+           * El ancho lo pone la fila, no los inputs.
+           *
+           * Un Input ya trae w-full en su base, y cn() solo concatena: no
+           * resuelve conflictos de Tailwind, asi que un w-1/3 pasado por
+           * className no lo pisa —entre dos utilidades del mismo tipo gana el
+           * orden del CSS, no el del atributo—. El nombre quedaba al 100% y la
+           * direccion, con flex-1 y base 0, aplastada a nada.
+           */
           <div key={index} className="flex gap-2">
-            <Input
-              aria-label={`Nombre del enlace ${index + 1}`}
-              value={link.label}
-              maxLength={40}
-              onChange={(event) => update(index, { label: event.target.value })}
-              placeholder="Documentacion"
-              className="w-1/3"
-            />
-            <Input
-              aria-label={`Direccion del enlace ${index + 1}`}
-              value={link.url}
-              onChange={(event) => update(index, { url: event.target.value })}
-              placeholder="https://docs.tuproyecto.cr"
-              className="flex-1"
-            />
+            <div className="w-1/3">
+              <Input
+                aria-label={`Nombre del enlace ${index + 1}`}
+                value={link.label}
+                maxLength={40}
+                onChange={(event) => update(index, { label: event.target.value })}
+                placeholder="Documentacion"
+              />
+            </div>
+            <div className="flex-1">
+              <Input
+                aria-label={`Direccion del enlace ${index + 1}`}
+                value={link.url}
+                onChange={(event) => update(index, { url: event.target.value })}
+                placeholder="https://docs.tuproyecto.cr"
+              />
+            </div>
             <Button
+              type="button"
               icon
               variant="ghost"
               aria-label={`Quitar el enlace ${index + 1}`}
@@ -69,6 +81,7 @@ export function LinkFields({
 
       {links.length < MAX_PROJECT_LINKS ? (
         <Button
+          type="button"
           size="sm"
           className="mt-3"
           onClick={() => onChange([...links, { label: "", url: "" }])}
