@@ -165,7 +165,7 @@ export function SubmitForm({ authenticated }: { authenticated: boolean }) {
         label="Enlace"
         htmlFor="url"
         error={errors.url}
-        support="El sitio donde la gente lo puede usar."
+        support="El sitio donde la gente lo puede usar. Tiene que estar arriba y cargar por https."
       >
         <Input
           id="url"
@@ -182,7 +182,7 @@ export function SubmitForm({ authenticated }: { authenticated: boolean }) {
         htmlFor="repo_url"
         optional
         error={errors.repo_url}
-        support="Si esta en tu cuenta de GitHub, podes verificar el proyecto al instante."
+        support="GitHub, GitLab, Bitbucket, Codeberg o SourceHut. Si el repo esta en tu cuenta de GitHub, podes verificar el proyecto al instante."
       >
         <Input
           id="repo_url"

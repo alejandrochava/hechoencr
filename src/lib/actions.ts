@@ -3,11 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { checkRepo, checkSite } from "@/lib/link-check";
 import { findPreviewImage } from "@/lib/preview";
 import { TAG_VALUES } from "@/lib/site";
 import { domainAcceptsMail } from "@/lib/email";
 import { notifyNewMessage } from "@/lib/mailer";
 import {
+  REPO_FORGES,
   isDisposableEmail,
   isValidCRMobile,
   isValidEmailSyntax,
@@ -86,13 +88,51 @@ export async function submitProject(_prev: ActionState, formData: FormData): Pro
   if (tagline.length < 10) fields.tagline = "Contanos en una linea que hace, minimo 10 caracteres.";
   if (tagline.length > 140) fields.tagline = "Maximo 140 caracteres.";
   if (!isValidHttpUrl(url)) fields.url = "Revisa el enlace: tiene que ser una direccion web valida.";
-  if (repoUrl && !isValidHttpUrl(repoUrl)) fields.repo_url = "Ese enlace no parece valido.";
   if (description.length > 4000) fields.description = "Maximo 4000 caracteres.";
   if (tags.length === 0) fields.tags = "Elegi al menos una categoria.";
 
   if (Object.keys(fields).length > 0) {
     return { error: "Revisa los campos marcados.", fields };
   }
+
+  /*
+   * Recien aca se toca la red: primero lo que se resuelve gratis, y solo si
+   * eso pasa se le pregunta al sitio y a la forja. Las dos consultas van en
+   * paralelo porque no dependen entre si.
+   */
+  const [site, repo] = await Promise.all([
+    checkSite(url),
+    repoUrl ? checkRepo(repoUrl) : Promise.resolve(null),
+  ]);
+
+  // Los dos errores se devuelven juntos: si no, se arregla uno, se reenvia y
+  // aparece el otro.
+  if (!site.ok || repo?.ok === false) {
+    if (!site.ok) {
+      fields.url = {
+        invalida: "Revisa el enlace: tiene que ser una direccion web valida.",
+        privada: "Ese enlace no apunta a un sitio publico.",
+        "no-existe":
+          "No encontramos nada en ese enlace. Revisa que este bien escrito y que el sitio este arriba.",
+        "sin-https":
+          "Ese sitio no carga por https. Para entrar al directorio necesita conexion segura.",
+      }[site.reason];
+    }
+
+    if (repo?.ok === false) {
+      fields.repo_url =
+        repo.reason === "no-es-forja"
+          ? `El repositorio tiene que estar en ${REPO_FORGES.map((forge) => forge.label).join(", ")}.`
+          : "Ese repositorio no existe o es privado.";
+    }
+
+    return { error: "Revisa los campos marcados.", fields };
+  }
+
+  // Se guarda lo comprobado: la URL con https resuelto y el repo canonico, sin
+  // .git ni la subruta que venia pegada de la barra de direcciones.
+  const finalUrl = site.url;
+  const finalRepoUrl = repo?.ok ? repo.ref.url : null;
 
   const base = slugify(name) || "proyecto";
   let slug = base;
@@ -104,15 +144,15 @@ export async function submitProject(_prev: ActionState, formData: FormData): Pro
 
   // La vista previa se busca antes de insertar para que la tarjeta ya nazca
   // con imagen; si el sitio no responde, findPreviewImage devuelve el fallback.
-  const imageUrl = await findPreviewImage(url);
+  const imageUrl = await findPreviewImage(finalUrl);
 
   const { error } = await supabase.from("projects").insert({
     slug,
     name,
     tagline,
     description: description || null,
-    url,
-    repo_url: repoUrl || null,
+    url: finalUrl,
+    repo_url: finalRepoUrl,
     image_url: imageUrl,
     links,
     tags,

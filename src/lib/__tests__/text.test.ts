@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   formatPhoneCR,
   githubOwner,
+  isPublicHttpUrl,
+  repoRef,
   emailDomain,
   isDisposableEmail,
   isValidCRMobile,
@@ -191,5 +193,123 @@ describe("enlaces extra del proyecto", () => {
     expect(sanitizeProjectLinks(null)).toEqual([]);
     expect(sanitizeProjectLinks("texto")).toEqual([]);
     expect(sanitizeProjectLinks([null, 42, "x"])).toEqual([]);
+  });
+});
+
+describe("repoRef", () => {
+  it("lee dueno y repo de GitHub", () => {
+    expect(repoRef("https://github.com/alejandrochava/hechoencr")).toMatchObject({
+      host: "github.com",
+      label: "GitHub",
+      owner: "alejandrochava",
+      repo: "hechoencr",
+      url: "https://github.com/alejandrochava/hechoencr",
+    });
+  });
+
+  it("completa el esquema, saca el www y normaliza el dueno a minuscula", () => {
+    expect(repoRef("www.GitHub.com/AlejandroChava/HechoEnCR")).toMatchObject({
+      owner: "alejandrochava",
+      repo: "HechoEnCR",
+      url: "https://github.com/AlejandroChava/HechoEnCR",
+    });
+  });
+
+  it("saca el .git del final", () => {
+    expect(repoRef("https://github.com/usuario/repo.git")?.url).toBe(
+      "https://github.com/usuario/repo",
+    );
+  });
+
+  it("corta la subruta que viene pegada de la barra de direcciones", () => {
+    expect(repoRef("https://github.com/usuario/repo/tree/main/src")?.url).toBe(
+      "https://github.com/usuario/repo",
+    );
+    expect(repoRef("https://github.com/usuario/repo/issues/12")?.repo).toBe("repo");
+  });
+
+  it("acepta subgrupos de GitLab", () => {
+    expect(repoRef("https://gitlab.com/grupo/subgrupo/repo")?.url).toBe(
+      "https://gitlab.com/grupo/subgrupo/repo",
+    );
+  });
+
+  it("acepta el ~usuario de SourceHut", () => {
+    expect(repoRef("https://git.sr.ht/~usuario/repo")).toMatchObject({
+      owner: "usuario",
+      url: "https://git.sr.ht/~usuario/repo",
+    });
+  });
+
+  it("rechaza lo que no es una forja conocida", () => {
+    expect(repoRef("https://miservidor.cr/git/repo")).toBeNull();
+    expect(repoRef("https://gitlab.miempresa.cr/grupo/repo")).toBeNull();
+  });
+
+  it("rechaza una forja sin repositorio", () => {
+    expect(repoRef("https://github.com/usuario")).toBeNull();
+    expect(repoRef("https://github.com")).toBeNull();
+    expect(repoRef("https://github.com/usuario/repo/tree")).toMatchObject({ repo: "repo" });
+  });
+
+  it("no se cae con basura", () => {
+    expect(repoRef("")).toBeNull();
+    expect(repoRef(null)).toBeNull();
+    expect(repoRef("no es una url")).toBeNull();
+  });
+});
+
+describe("isPublicHttpUrl", () => {
+  it("acepta http y https publicos", () => {
+    expect(isPublicHttpUrl("https://hechoencr.vercel.app")).toBe(true);
+    expect(isPublicHttpUrl("http://ejemplo.cr/algo?x=1")).toBe(true);
+    expect(isPublicHttpUrl("https://8.8.8.8")).toBe(true);
+  });
+
+  it("rechaza esquemas que no son web", () => {
+    expect(isPublicHttpUrl("ftp://ejemplo.cr")).toBe(false);
+    expect(isPublicHttpUrl("javascript:alert(1)")).toBe(false);
+    expect(isPublicHttpUrl("file:///etc/passwd")).toBe(false);
+    expect(isPublicHttpUrl("no es una url")).toBe(false);
+  });
+
+  it("rechaza nombres de la red local", () => {
+    expect(isPublicHttpUrl("http://localhost:3000")).toBe(false);
+    expect(isPublicHttpUrl("http://api.localhost")).toBe(false);
+    expect(isPublicHttpUrl("http://impresora.local")).toBe(false);
+    expect(isPublicHttpUrl("http://db.internal")).toBe(false);
+    expect(isPublicHttpUrl("http://router.home.arpa")).toBe(false);
+  });
+
+  it("rechaza direcciones privadas escritas como IP", () => {
+    for (const host of [
+      "127.0.0.1",
+      "10.0.0.1",
+      "192.168.1.1",
+      "172.16.0.1",
+      "172.31.255.255",
+      "169.254.169.254",
+      "100.64.0.1",
+      "0.0.0.0",
+      "239.255.255.250",
+    ]) {
+      expect(isPublicHttpUrl(`http://${host}/`), host).toBe(false);
+    }
+  });
+
+  it("acepta rangos publicos que se parecen a los privados", () => {
+    expect(isPublicHttpUrl("http://172.15.0.1/")).toBe(true);
+    expect(isPublicHttpUrl("http://172.32.0.1/")).toBe(true);
+    expect(isPublicHttpUrl("http://100.63.0.1/")).toBe(true);
+  });
+
+  it("rechaza IPv6 local y la v4 mapeada adentro", () => {
+    expect(isPublicHttpUrl("http://[::1]/")).toBe(false);
+    expect(isPublicHttpUrl("http://[fe80::1]/")).toBe(false);
+    expect(isPublicHttpUrl("http://[fc00::1]/")).toBe(false);
+    // new URL normaliza la parte v4 a hexadecimal: ::ffff:7f00:1
+    expect(isPublicHttpUrl("http://[::ffff:127.0.0.1]/")).toBe(false);
+    expect(isPublicHttpUrl("http://[::ffff:7f00:1]/")).toBe(false);
+    expect(isPublicHttpUrl("http://[::ffff:808:808]/")).toBe(true);
   });
 });

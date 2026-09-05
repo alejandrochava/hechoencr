@@ -56,6 +56,194 @@ export function githubOwner(url: string | null | undefined) {
   return match ? match[1].toLowerCase() : null;
 }
 
+/* ---------------------------------------------------------------------
+   Enlaces que apuntan a la red interna
+   --------------------------------------------------------------------- */
+
+/**
+ * Version de una direccion IP escrita como texto: 4, 6 o 0 si no es una IP.
+ *
+ * No usa node:net porque este archivo lo importan componentes del navegador.
+ * Alcanza de sobra: lo unico que necesitamos es clasificar, y del lado del
+ * servidor las direcciones ya vienen normalizadas por el DNS.
+ */
+export function ipVersionOf(value: string): 0 | 4 | 6 {
+  const bare = value.replace(/^\[|\]$/g, "");
+
+  const v4 = bare.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) return v4.slice(1).every((part) => Number(part) <= 255) ? 4 : 0;
+
+  if (bare.includes(":") && /^[0-9a-f:.]+$/i.test(bare)) return 6;
+  return 0;
+}
+
+/**
+ * Rangos que nunca son un sitio publico.
+ *
+ * Se aplica dos veces: al host tal como se escribio, por si es una IP literal,
+ * y del lado del servidor a cada direccion que devuelve el DNS. Lo segundo es
+ * lo que de verdad protege: un dominio comun puede resolver a 127.0.0.1 y
+ * mirando solo el texto no se ve.
+ */
+export function isPrivateAddress(address: string) {
+  const version = ipVersionOf(address);
+  if (version === 0) return false;
+
+  const bare = address.replace(/^\[|\]$/g, "").toLowerCase();
+
+  if (version === 4) {
+    const [a, b] = bare.split(".").map(Number);
+    if (a === 0 || a === 10 || a === 127) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    // Carrier grade NAT: 100.64.0.0/10.
+    if (a === 100 && b >= 64 && b <= 127) return true;
+    // Multicast y reservados.
+    return a >= 224;
+  }
+
+  if (bare === "::" || bare === "::1") return true;
+  // Enlace local (fe80::/10) y direcciones unicas locales (fc00::/7).
+  if (/^fe[89ab]/.test(bare)) return true;
+  if (/^f[cd]/.test(bare)) return true;
+
+  /*
+   * IPv4 mapeada adentro de una IPv6: se juzga por su parte v4. Viene de dos
+   * formas y hay que aceptar las dos: con puntos, como la escribe la gente y
+   * como la devuelve el DNS, y en hexadecimal, que es a lo que la normaliza
+   * `new URL` (::ffff:127.0.0.1 se guarda como ::ffff:7f00:1).
+   */
+  const dotted = bare.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (dotted) return isPrivateAddress(dotted[1]);
+
+  const hex = bare.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (hex) {
+    const high = parseInt(hex[1], 16);
+    const low = parseInt(hex[2], 16);
+    return isPrivateAddress(`${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`);
+  }
+
+  return false;
+}
+
+/**
+ * Primer filtro de un enlace ajeno, solo por texto y sin tocar la red.
+ * Descarta esquemas que no son web y todo lo que apunta a la red interna.
+ */
+export function isPublicHttpUrl(raw: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+
+  const host = parsed.hostname.toLowerCase();
+  if (!host || host.includes("..")) return false;
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return false;
+  if (host.endsWith(".internal") || host.endsWith(".home.arpa")) return false;
+
+  return !isPrivateAddress(host);
+}
+
+/* ---------------------------------------------------------------------
+   Repositorios
+   --------------------------------------------------------------------- */
+
+/**
+ * Forjas que aceptamos como repositorio.
+ *
+ * La lista es blanca a proposito: "repositorio" tiene que significar codigo
+ * que alguien puede abrir y leer, no cualquier URL. GitHub va primero porque
+ * es el unico con verificacion instantanea de reclamos (claim_with_github);
+ * las demas sirven igual para mostrar el codigo.
+ */
+export const REPO_FORGES = [
+  { host: "github.com", label: "GitHub" },
+  { host: "gitlab.com", label: "GitLab" },
+  { host: "bitbucket.org", label: "Bitbucket" },
+  { host: "codeberg.org", label: "Codeberg" },
+  { host: "git.sr.ht", label: "SourceHut" },
+] as const;
+
+export type RepoRef = {
+  host: string;
+  label: string;
+  owner: string;
+  repo: string;
+  /** La URL canonica: sin .git, sin query, sin la subruta que venia pegada. */
+  url: string;
+};
+
+/**
+ * Segmentos que ya no son parte del nombre del repositorio.
+ *
+ * La gente copia la barra de direcciones, y ahi viene "/tree/main" o
+ * "/issues/12" pegado. Sin cortar, el nombre del repo terminaria siendo "main".
+ */
+const REPO_SUBPATHS = new Set([
+  "-",
+  "actions",
+  "blob",
+  "branch",
+  "commit",
+  "commits",
+  "issues",
+  "pull",
+  "pulls",
+  "releases",
+  "settings",
+  "src",
+  "tags",
+  "tree",
+  "wiki",
+]);
+
+/**
+ * Lee una URL de repositorio. Devuelve null si no es de una forja conocida o
+ * si no llega a apuntar a un repositorio (le falta el dueno o el nombre).
+ */
+export function repoRef(value: string | null | undefined): RepoRef | null {
+  if (!value) return null;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(normalizeUrl(value));
+  } catch {
+    return null;
+  }
+
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+  const forge = REPO_FORGES.find((candidate) => candidate.host === host);
+  if (!forge) return null;
+
+  let segments = parsed.pathname.split("/").filter(Boolean);
+
+  const cut = segments.findIndex((segment) => REPO_SUBPATHS.has(segment.toLowerCase()));
+  if (cut !== -1) segments = segments.slice(0, cut);
+
+  // GitLab permite subgrupos (grupo/subgrupo/repo); el resto es dueno/repo.
+  if (forge.host !== "gitlab.com") segments = segments.slice(0, 2);
+  if (segments.length < 2) return null;
+
+  const repo = segments[segments.length - 1].replace(/\.git$/i, "");
+  // SourceHut escribe al dueno como ~usuario.
+  const owner = segments[0].replace(/^~/, "");
+  if (!owner || !repo) return null;
+
+  const path = [...segments.slice(0, -1), repo].join("/");
+  return {
+    host: forge.host,
+    label: forge.label,
+    owner: owner.toLowerCase(),
+    repo,
+    url: `https://${forge.host}/${path}`,
+  };
+}
+
 /** Solo rutas internas: evita que un `next` externo secuestre el redirect. */
 export function safeNextPath(value: string | null | undefined, fallback = "/") {
   if (!value) return fallback;

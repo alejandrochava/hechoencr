@@ -1,5 +1,7 @@
 import "server-only";
 
+import { isPublicHttpUrl } from "@/lib/text";
+
 /**
  * Vista previa de un proyecto, en cascada:
  *   1. la og:image que el sitio ya declara (la mejor, la eligio su autor),
@@ -9,29 +11,6 @@ import "server-only";
 
 const FETCH_TIMEOUT_MS = 5000;
 const MAX_HTML_BYTES = 512 * 1024;
-
-/** No dejamos que una URL enviada por un usuario apunte a la red interna. */
-function isPublicHttpUrl(raw: string) {
-  let parsed: URL;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    return false;
-  }
-
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
-
-  const host = parsed.hostname.toLowerCase();
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return false;
-  if (host === "0.0.0.0" || host === "::1" || host === "[::1]") return false;
-  if (/^127\./.test(host)) return false;
-  if (/^10\./.test(host)) return false;
-  if (/^192\.168\./.test(host)) return false;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return false;
-  if (/^169\.254\./.test(host)) return false;
-
-  return true;
-}
 
 function extractMetaImage(html: string) {
   // Buscamos en orden de preferencia; la primera que aparezca gana.
