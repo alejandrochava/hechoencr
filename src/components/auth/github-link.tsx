@@ -18,7 +18,12 @@ export function GithubLink() {
       provider: "github",
       options: { redirectTo: `${window.location.origin}/auth/callback?next=${window.location.pathname}` },
     });
-    if (linkError) setError(linkError.message);
+    // El mensaje de Supabase viene en ingles y habla de su API, no de lo que
+    // la persona intento hacer. El detalle queda en la consola.
+    if (linkError) {
+      console.error("linkIdentity:", linkError.message);
+      setError("No pudimos conectar tu cuenta de GitHub. Proba de nuevo en un rato.");
+    }
   }
 
   return (
