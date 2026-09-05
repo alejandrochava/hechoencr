@@ -22,6 +22,9 @@ export function SiteFooter() {
           <Link href="/privacidad" className="transition-colors duration-200 ease-brand hover:text-text">
             Privacidad
           </Link>
+          <Link href="/terminos" className="transition-colors duration-200 ease-brand hover:text-text">
+            Terminos
+          </Link>
         </nav>
       </Container>
     </footer>
