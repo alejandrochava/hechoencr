@@ -115,9 +115,15 @@ export function Toggle({
           disabled && "opacity-55",
         )}
       >
+        {/*
+          left-0 no es decorativo: sin el, `absolute` cae en la posicion
+          estatica y los <button> centran su contenido, asi que la perilla
+          arrancaba desde el medio del riel y con el translate de encendido se
+          salia por la derecha. Los dos desplazamientos se miden desde el borde.
+        */}
         <span
           className={cn(
-            "absolute top-0.5 size-5 rounded-full bg-surface shadow transition-transform duration-200 ease-brand",
+            "absolute left-0 top-0.5 size-5 rounded-full bg-surface shadow transition-transform duration-200 ease-brand",
             checked ? "translate-x-[1.125rem]" : "translate-x-0.5",
           )}
         />
