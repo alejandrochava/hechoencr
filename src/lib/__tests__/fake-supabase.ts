@@ -82,8 +82,16 @@ export function fakeSupabase(config: ConfigFake = {}) {
     return chain;
   }
 
+  const authCalls: string[] = [];
+
   const client = {
-    auth: { getUser: async () => ({ data: { user: config.user ?? null } }) },
+    auth: {
+      getUser: async () => ({ data: { user: config.user ?? null } }),
+      signOut: async () => {
+        authCalls.push("signOut");
+        return { error: null };
+      },
+    },
     from,
     rpc: async (name: string, args: unknown) => {
       rpcCalls.push({ name, args });
@@ -91,7 +99,7 @@ export function fakeSupabase(config: ConfigFake = {}) {
     },
   };
 
-  return { client, escrituras, rpcCalls };
+  return { client, escrituras, rpcCalls, authCalls };
 }
 
 /**

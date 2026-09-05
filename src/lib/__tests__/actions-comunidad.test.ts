@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
- * El resto de actions.ts: votar, reclamar, escribir un mensaje y la visibilidad
- * del perfil. Mismos dobles y mismo criterio que actions.test.ts.
+ * El resto de actions.ts: votar, reclamar, registrarse, escribir un mensaje, la
+ * visibilidad del perfil y lo de admin. Mismos dobles y mismo criterio que
+ * actions.test.ts.
  */
 
 const dobles = vi.hoisted(() => ({ cliente: null as unknown }));
@@ -30,10 +31,14 @@ import { revalidatePath } from "next/cache";
 import { domainAcceptsMail } from "@/lib/email";
 import { notifyNewMessage } from "@/lib/mailer";
 import {
+  checkRegistration,
   claimProject,
   claimWithGithub,
+  markMessageHandled,
+  resolveClaim,
   sendMessage,
   setProfileVisibility,
+  signOut,
   syncGithubHandle,
   toggleVote,
 } from "@/lib/actions";
@@ -381,5 +386,129 @@ describe("setProfileVisibility", () => {
 
     expect(revalidatePath).toHaveBeenCalledTimes(1);
     expect(revalidatePath).toHaveBeenCalledWith("/");
+  });
+});
+
+describe("checkRegistration", () => {
+  function registro(cambios: Record<string, string> = {}) {
+    return form({ email: "alejandra@ejemplo.cr", phone: "8123-4567", ...cambios });
+  }
+
+  it("rechaza un correo con mala sintaxis", async () => {
+    db({ rpc: { data: false } });
+
+    const state = await checkRegistration(null, registro({ email: "arroba-perdida" }));
+
+    expect(state?.fields?.email).toBe("Ese correo no parece valido.");
+  });
+
+  it("rechaza los correos temporales", async () => {
+    db({ rpc: { data: false } });
+
+    const state = await checkRegistration(null, registro({ email: "alguien@mailinator.com" }));
+
+    expect(state?.fields?.email).toContain("correos temporales");
+  });
+
+  it("rechaza un dominio que no recibe correo", async () => {
+    db({ rpc: { data: false } });
+    vi.mocked(domainAcceptsMail).mockResolvedValue(false);
+
+    const state = await checkRegistration(null, registro());
+
+    expect(state?.fields?.email).toContain("no recibe correo");
+  });
+
+  it("rechaza fijos, VoIP y numeros de relleno", async () => {
+    for (const phone of ["2233-4455", "4000-1234", "8888-8888", "123"]) {
+      db({ rpc: { data: false } });
+      const state = await checkRegistration(null, registro({ phone }));
+      expect(state?.fields?.phone, phone).toContain("movil de Costa Rica");
+    }
+  });
+
+  it("no pregunta si el numero esta tomado cuando ya hay errores", async () => {
+    const { rpcCalls } = db({ rpc: { data: false } });
+
+    await checkRegistration(null, registro({ phone: "2233-4455" }));
+
+    expect(rpcCalls).toHaveLength(0);
+  });
+
+  it("acepta el movil con prefijo y lo devuelve normalizado a 8 digitos", async () => {
+    const { rpcCalls } = db({ rpc: { data: false } });
+
+    const state = await checkRegistration(null, registro({ phone: "+506 8123 4567" }));
+
+    expect(state).toEqual({ ok: "81234567" });
+    // La funcion de la base solo contesta si o no; nunca de quien es.
+    expect(rpcCalls).toEqual([{ name: "phone_taken", args: { p_phone: "81234567" } }]);
+  });
+
+  it("avisa si el numero ya tiene cuenta, sin decir de quien", async () => {
+    db({ rpc: { data: true } });
+
+    const state = await checkRegistration(null, registro());
+
+    expect(state?.fields?.phone).toBe("Ese numero ya tiene una cuenta. Entra con ella.");
+    expect(JSON.stringify(state)).not.toContain("ejemplo.cr");
+  });
+});
+
+describe("resolveClaim", () => {
+  it("aprueba pasandole el reclamo a la funcion de la base", async () => {
+    const { rpcCalls } = db({ user: { id: "admin" } });
+
+    await resolveClaim("c1", true);
+
+    expect(rpcCalls).toEqual([
+      { name: "resolve_claim", args: { p_claim_id: "c1", p_approve: true } },
+    ]);
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/reclamos");
+  });
+
+  it("rechazar es la misma llamada con el booleano en false", async () => {
+    const { rpcCalls } = db({ user: { id: "admin" } });
+
+    await resolveClaim("c1", false);
+
+    expect(rpcCalls[0].args).toEqual({ p_claim_id: "c1", p_approve: false });
+  });
+});
+
+describe("markMessageHandled", () => {
+  it("marca el mensaje y refresca la cola", async () => {
+    const { escrituras } = db({ user: { id: "admin" } });
+
+    await markMessageHandled("m1", true);
+
+    expect(escrituras).toEqual([
+      {
+        table: "messages",
+        op: "update",
+        payload: { handled: true },
+        filters: [["id", "m1"]],
+      },
+    ]);
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/mensajes");
+  });
+
+  it("tambien sirve para desmarcarlo", async () => {
+    const { escrituras } = db({ user: { id: "admin" } });
+
+    await markMessageHandled("m1", false);
+
+    expect(escrituras[0].payload).toEqual({ handled: false });
+  });
+});
+
+describe("signOut", () => {
+  it("cierra la sesion y manda a la portada", async () => {
+    const { authCalls } = db({ user: { id: "u1" } });
+
+    const { destino } = await correr(() => signOut());
+
+    expect(authCalls).toEqual(["signOut"]);
+    expect(destino).toBe("/");
   });
 });
