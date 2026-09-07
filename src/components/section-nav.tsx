@@ -28,6 +28,9 @@ export function SectionNav({ secciones, label }: { secciones: Seccion[]; label: 
 
   return (
     <Segmented
+      // Mide lo que ocupan las secciones. Estirado a todo el ancho parece una
+      // barra rota, con un hueco enorme despues de la ultima.
+      className="w-fit max-w-full"
       label={label}
       value={actual.href}
       size="sm"

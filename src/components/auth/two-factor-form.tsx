@@ -185,7 +185,8 @@ export function TwoFactorForm() {
             </div>
           </div>
         ) : (
-          <Button type="button" variant="ghost" size="sm" onClick={() => setQuitando(true)}>
+          // El relleno del boton lo correria a la derecha del texto de arriba.
+          <Button type="button" variant="ghost" size="sm" className="-ml-3" onClick={() => setQuitando(true)}>
             Quitar el segundo factor
           </Button>
         )}

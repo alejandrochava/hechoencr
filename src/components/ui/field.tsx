@@ -169,7 +169,11 @@ export function Field({
             error ? "text-flag" : "text-muted",
           )}
         >
-          {error ?? support}
+          {/*
+            Con ?? un error vacio ganaria: "" no es null, asi que el texto de
+            ayuda se perderia en todo formulario que arranque su estado en "".
+          */}
+          {error || support}
         </p>
       ) : null}
     </div>
