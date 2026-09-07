@@ -158,11 +158,35 @@ describe("listPublicRepos", () => {
     }
   });
 
-  it("un token rechazado no se confunde con un problema de red", async () => {
+  it("sin token nuestro, un 401 se distingue de un problema de red", async () => {
     const listPublicRepos = await cargar();
+    vi.stubEnv("GITHUB_TOKEN", "");
     conFetch(respuesta({ message: "Bad credentials" }, 401));
 
     expect(await listPublicRepos("alejandra")).toEqual({ ok: false, reason: "credencial" });
+  });
+
+  it("si rechazan nuestro token, vuelve a preguntar sin el", async () => {
+    const listPublicRepos = await cargar();
+    vi.stubEnv("GITHUB_TOKEN", "vencido");
+    const espia = conFetch(respuesta({ message: "Bad credentials" }, 401), respuesta([REPO]));
+
+    const resultado = await listPublicRepos("alejandra");
+
+    // La lista es publica: que nos rechacen el token no puede dejar sin la
+    // funcion a quien publica.
+    expect(resultado.ok && resultado.repos).toHaveLength(1);
+    expect(espia).toHaveBeenCalledTimes(2);
+    expect(espia.mock.calls[0][1]?.headers).toHaveProperty("authorization");
+    expect(espia.mock.calls[1][1]?.headers).not.toHaveProperty("authorization");
+  });
+
+  it("si sin token tampoco se puede, gana ese fallo y no el 401", async () => {
+    const listPublicRepos = await cargar();
+    vi.stubEnv("GITHUB_TOKEN", "vencido");
+    conFetch(respuesta({ message: "Bad credentials" }, 401), respuesta({ message: "rate limit" }, 403));
+
+    expect(await listPublicRepos("alejandra")).toEqual({ ok: false, reason: "limite" });
   });
 
   it("cualquier otro problema es sin-respuesta", async () => {

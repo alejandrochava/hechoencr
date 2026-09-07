@@ -82,6 +82,53 @@ function normalizar(crudo: RepoCrudo): GithubRepo | null {
   };
 }
 
+/** Una consulta a la API, traducida a lo que el sitio entiende. */
+async function consultar(url: string, cuenta: string, token?: string): Promise<ReposResult> {
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      headers: {
+        accept: "application/vnd.github+json",
+        "x-github-api-version": "2022-11-28",
+        "user-agent": "HechoEnCR/1.0 (+https://hechoencr.cr)",
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (response.status === 404) return { ok: false, reason: "no-existe" };
+
+    if (response.status === 403 || response.status === 429) {
+      // GitHub usa 403 tanto para el limite como para un token invalido; para
+      // quien esta del otro lado el consejo es el mismo: esperar.
+      return { ok: false, reason: "limite" };
+    }
+
+    // Nuestro token esta vencido o mal pegado. No es un problema de quien
+    // publica ni algo que se arregle esperando, asi que se distingue del resto.
+    if (response.status === 401) return { ok: false, reason: "credencial" };
+
+    if (!response.ok) {
+      console.error(`listPublicRepos: GitHub respondio ${response.status} para @${cuenta}`);
+      return { ok: false, reason: "sin-respuesta" };
+    }
+
+    const crudos = (await response.json()) as unknown;
+    const repos = (Array.isArray(crudos) ? crudos : [])
+      // Se descarta lo que no es un objeto antes de leerlo: una entrada rara
+      // no deberia convertir la lista entera en un fallo.
+      .filter((crudo): crudo is RepoCrudo => typeof crudo === "object" && crudo !== null)
+      // Un fork no es tu proyecto, es el de alguien mas.
+      .filter((crudo) => crudo.fork !== true)
+      .map(normalizar)
+      .filter((repo): repo is GithubRepo => repo !== null);
+
+    return { ok: true, repos };
+  } catch (error) {
+    console.error(`listPublicRepos: fallo la consulta a GitHub para @${cuenta}:`, error);
+    return { ok: false, reason: "sin-respuesta" };
+  }
+}
+
 export async function listPublicRepos(handle: string): Promise<ReposResult> {
   const cuenta = handle.trim().toLowerCase();
   if (!cuenta) return { ok: false, reason: "no-existe" };
@@ -94,50 +141,19 @@ export async function listPublicRepos(handle: string): Promise<ReposResult> {
     `https://api.github.com/users/${encodeURIComponent(cuenta)}/repos` +
     `?per_page=${MAX_REPOS}&sort=pushed&direction=desc&type=owner`;
 
-  let resultado: ReposResult;
+  let resultado = await consultar(url, cuenta, token);
 
-  try {
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: {
-        accept: "application/vnd.github+json",
-        "x-github-api-version": "2022-11-28",
-        "user-agent": "HechoEnCR/1.0 (+https://hechoencr.cr)",
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-      },
-    });
-
-    if (response.status === 404) {
-      resultado = { ok: false, reason: "no-existe" };
-    } else if (response.status === 403 || response.status === 429) {
-      // GitHub usa 403 tanto para el limite como para un token invalido; para
-      // quien esta del otro lado el consejo es el mismo: esperar.
-      resultado = { ok: false, reason: "limite" };
-    } else if (response.status === 401) {
-      // Nuestro token esta vencido o mal pegado. No es un problema de quien
-      // publica ni algo que se arregle esperando: lo tenemos que cambiar
-      // nosotros, asi que se distingue del resto.
-      console.error(`listPublicRepos: GitHub rechazo nuestro token (401) para @${cuenta}`);
-      resultado = { ok: false, reason: "credencial" };
-    } else if (!response.ok) {
-      console.error(`listPublicRepos: GitHub respondio ${response.status} para @${cuenta}`);
-      resultado = { ok: false, reason: "sin-respuesta" };
-    } else {
-      const crudos = (await response.json()) as unknown;
-      const repos = (Array.isArray(crudos) ? crudos : [])
-        // Se descarta lo que no es un objeto antes de leerlo: una entrada rara
-        // no deberia convertir la lista entera en un fallo.
-        .filter((crudo): crudo is RepoCrudo => typeof crudo === "object" && crudo !== null)
-        // Un fork no es tu proyecto, es el de alguien mas.
-        .filter((crudo) => crudo.fork !== true)
-        .map(normalizar)
-        .filter((repo): repo is GithubRepo => repo !== null);
-
-      resultado = { ok: true, repos };
-    }
-  } catch (error) {
-    console.error(`listPublicRepos: fallo la consulta a GitHub para @${cuenta}:`, error);
-    resultado = { ok: false, reason: "sin-respuesta" };
+  /*
+   * Un 401 solo puede ser nuestro: esta lista es publica y sin token se lee
+   * igual. El token es un lujo —mas margen de consultas—, no un requisito, asi
+   * que si lo rechazan se vuelve a preguntar sin el en vez de dejar sin la
+   * funcion a quien publica. Queda en el log, que es donde nos toca a nosotros.
+   */
+  if (!resultado.ok && resultado.reason === "credencial" && token) {
+    console.error(
+      `listPublicRepos: GitHub rechazo nuestro token (401); se reintenta sin el para @${cuenta}`,
+    );
+    resultado = await consultar(url, cuenta);
   }
 
   // Un fallo tambien se recuerda, un rato: si estamos contra el limite, seguir
