@@ -24,10 +24,26 @@ function initials(name: string) {
     .toUpperCase();
 }
 
+/*
+ * El servicio de capturas las genera en segundo plano y, mientras tanto, sirve
+ * un marcador de 400x300 en vez de la imagen. No es un error —carga bien— asi
+ * que hay que reconocerlo por el tamano: una captura de verdad viene al ancho
+ * que pedimos, 1280. El umbral deja lugar de sobra entre una cosa y la otra.
+ *
+ * No se reintenta en la misma vista: la URL no se cachea, asi que la proxima
+ * carga ya trae la imagen. Lo que importa es no mostrar el marcador.
+ */
+const SERVICIO_DE_CAPTURAS = "s.wordpress.com/mshots/";
+const ANCHO_MINIMO = 600;
+
+function esMarcador(src: string, anchoReal: number) {
+  return src.includes(SERVICIO_DE_CAPTURAS) && anchoReal > 0 && anchoReal < ANCHO_MINIMO;
+}
+
 /**
- * Vista previa del proyecto. Si no hay imagen, o si la que hay no carga
- * (el sitio se cayo, el screenshot todavia no existe), dibuja un monograma
- * en vez de dejar un hueco gris.
+ * Vista previa del proyecto. Si no hay imagen, si la que hay no carga (el sitio
+ * se cayo) o si la captura todavia se esta generando, dibuja un monograma en
+ * vez de dejar un hueco gris o mostrar el marcador del servicio.
  */
 export function ProjectPreview({
   name,
@@ -40,15 +56,18 @@ export function ProjectPreview({
   imageUrl: string | null;
   priority?: boolean;
 }) {
-  const [failed, setFailed] = useState(false);
+  const [sinImagen, setSinImagen] = useState(false);
 
-  if (imageUrl && !failed) {
+  if (imageUrl && !sinImagen) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={imageUrl}
         alt={`Vista previa de ${name}`}
-        onError={() => setFailed(true)}
+        onError={() => setSinImagen(true)}
+        onLoad={(event) => {
+          if (esMarcador(imageUrl, event.currentTarget.naturalWidth)) setSinImagen(true);
+        }}
         loading={priority ? "eager" : "lazy"}
         className="size-full object-cover transition duration-500 group-hover:scale-[1.03]"
       />
