@@ -86,7 +86,14 @@ export function Container({
   );
 }
 
-/** Interruptor de si/no. Mismo lenguaje visual que el resto de controles. */
+/**
+ * Interruptor de si/no, como una fila de ajustes: el texto a la izquierda y el
+ * control a la derecha, que es donde se lo busca en una lista de opciones.
+ *
+ * Encendido va en tinta y no en el color de acento: en una pagina que por lo
+ * demas es blanco y negro, el azul se lleva toda la atencion para algo que no
+ * es la accion principal.
+ */
 export function Toggle({
   checked,
   onChange,
@@ -101,7 +108,14 @@ export function Toggle({
   disabled?: boolean;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3">
+    <label className="flex cursor-pointer items-start justify-between gap-4 p-4">
+      <span className="text-sm">
+        <span className="font-medium">{label}</span>
+        {description ? (
+          <span className="mt-0.5 block leading-relaxed text-muted">{description}</span>
+        ) : null}
+      </span>
+
       <button
         type="button"
         role="switch"
@@ -111,7 +125,7 @@ export function Toggle({
         onClick={() => onChange(!checked)}
         className={cn(
           "relative mt-0.5 h-6 w-10 shrink-0 rounded-full transition-colors duration-200 ease-brand",
-          checked ? "bg-accent" : "bg-surface-3",
+          checked ? "bg-ink" : "bg-surface-3",
           disabled && "opacity-55",
         )}
       >
@@ -120,20 +134,17 @@ export function Toggle({
           estatica y los <button> centran su contenido, asi que la perilla
           arrancaba desde el medio del riel y con el translate de encendido se
           salia por la derecha. Los dos desplazamientos se miden desde el borde.
+
+          La perilla cambia de color con el riel: en modo oscuro la tinta es
+          casi blanca, y una perilla clara encima desapareceria.
         */}
         <span
           className={cn(
-            "absolute left-0 top-0.5 size-5 rounded-full bg-knob shadow transition-transform duration-200 ease-brand",
-            checked ? "translate-x-[1.125rem]" : "translate-x-0.5",
+            "absolute left-0 top-0.5 size-5 rounded-full shadow transition-transform duration-200 ease-brand",
+            checked ? "bg-ink-contrast translate-x-[1.125rem]" : "bg-knob translate-x-0.5",
           )}
         />
       </button>
-      <span className="text-sm">
-        <span className="font-medium">{label}</span>
-        {description ? (
-          <span className="mt-0.5 block leading-relaxed text-muted">{description}</span>
-        ) : null}
-      </span>
     </label>
   );
 }

@@ -92,25 +92,25 @@ export default async function ProfilePage({ params }: PageProps<"/u/[handle]">) 
             ) : null}
           </div>
 
+          {/*
+            Solo para el dueno. Las tres van juntas y con la misma forma porque
+            son la misma cosa: lo que podes hacer con tu cuenta. Sueltas, el
+            interruptor quedaba flotando y los dos enlaces se leian como un pie
+            de foto, sin nada que dijera que llevan a alguna parte.
+          */}
           {isMe ? (
-            <div className="mt-6 space-y-5 border-t border-border/70 pt-5">
+            <div className="mt-8 divide-y divide-border overflow-hidden rounded-card border border-border">
               <ProfileVisibility initial={profile.public_profile} />
-
-              {/* Las dos paginas de /cuenta existian sin entrada desde ningun lado. */}
-              <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-                <Link
-                  href="/cuenta/2fa"
-                  className="text-muted transition-colors duration-200 ease-brand hover:text-text"
-                >
-                  Segundo factor
-                </Link>
-                <Link
-                  href="/cuenta/clave"
-                  className="text-muted transition-colors duration-200 ease-brand hover:text-text"
-                >
-                  Tu contrasena
-                </Link>
-              </div>
+              <AjusteLink
+                href="/cuenta/2fa"
+                label="Segundo factor"
+                description="Un codigo de tu telefono, ademas de tu cuenta, para entrar a la administracion."
+              />
+              <AjusteLink
+                href="/cuenta/clave"
+                label="Tu contrasena"
+                description="Opcional: sirve para volver a entrar sin esperar el correo."
+              />
             </div>
           ) : null}
         </div>
@@ -143,5 +143,47 @@ export default async function ProfilePage({ params }: PageProps<"/u/[handle]">) 
         </p>
       )}
     </Container>
+  );
+}
+
+/**
+ * Una fila que lleva a otra pagina.
+ *
+ * Ocupa el ancho, se ilumina al pasar por encima y termina en una punta de
+ * flecha: tres cosas que un enlace suelto de texto gris no tiene, y que son las
+ * que hacen que se lea como un camino y no como una aclaracion.
+ */
+function AjusteLink({
+  href,
+  label,
+  description,
+}: {
+  href: string;
+  label: string;
+  description: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-between gap-4 p-4 transition-colors duration-200 ease-brand hover:bg-surface-2"
+    >
+      <span className="text-sm">
+        <span className="font-medium">{label}</span>
+        <span className="mt-0.5 block leading-relaxed text-muted">{description}</span>
+      </span>
+
+      <svg
+        viewBox="0 0 20 20"
+        className="size-4 shrink-0 text-faint"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M7.5 4.5 13 10l-5.5 5.5" />
+      </svg>
+    </Link>
   );
 }
