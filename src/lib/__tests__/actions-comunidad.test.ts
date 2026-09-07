@@ -631,7 +631,7 @@ describe("listMyGithubRepos", () => {
     });
   });
 
-  it("sin homepage, el enlace es el propio repositorio", async () => {
+  it("sin homepage, el enlace queda vacio y no se repite el repositorio", async () => {
     db({
       user: { id: "u1" },
       singles: [{ data: { github_handle: "alejandra" } }],
@@ -644,7 +644,10 @@ describe("listMyGithubRepos", () => {
 
     const estado = await listMyGithubRepos();
 
-    expect(estado.ok && estado.repos[0].url).toBe(REPO.htmlUrl);
+    // El enlace es donde se usa el proyecto: poner ahi el repo seria hacer
+    // pasar el codigo por el sitio. Mejor vacio, que la persona lo complete.
+    expect(estado.ok && estado.repos[0].url).toBe("");
+    expect(estado.ok && estado.repos[0].repoUrl).toBe(REPO.htmlUrl);
   });
 
   it("una descripcion demasiado corta se deja vacia, que la bajada pide diez", async () => {

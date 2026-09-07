@@ -313,6 +313,7 @@ export type ImportableRepo = {
   name: string;
   fullName: string;
   tagline: string;
+  /** El sitio del proyecto, vacio si el repo no declara uno. */
   url: string;
   repoUrl: string;
   tags: string[];
@@ -425,7 +426,13 @@ export async function listMyGithubRepos(): Promise<ReposState> {
       fullName: repo.fullName,
       // La bajada pide diez caracteres; una descripcion mas corta no ayuda.
       tagline: (repo.description ?? "").length >= 10 ? repo.description!.slice(0, 140) : "",
-      url: repo.homepage ?? repo.htmlUrl,
+      /*
+       * El enlace y el repositorio son cosas distintas: el enlace es donde la
+       * gente usa el proyecto. Si el repo no declara homepage se deja vacio,
+       * que es mas honesto que repetir la URL de GitHub en los dos campos y
+       * hacer pasar el codigo por el sitio.
+       */
+      url: repo.homepage ?? "",
       repoUrl: repo.htmlUrl,
       tags: tagsFromTopics(repo.topics),
       stars: repo.stars,
