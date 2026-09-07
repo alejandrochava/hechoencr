@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { CODE_LENGTH, CodeInput } from "@/components/auth/code-input";
 import { Button } from "@/components/ui/button";
-import { Field, Input } from "@/components/ui/field";
+import { Field } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/primitives";
 import { useToast } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/client";
@@ -19,8 +20,6 @@ import { createClient } from "@/lib/supabase/client";
  * Quien manda de verdad es `public.is_admin()` en la base, que exige aal2. Esta
  * pantalla solo consigue ese nivel; no es la que autoriza.
  */
-
-const CODE_LENGTH = 6;
 
 type Estado =
   | { paso: "cargando" }
@@ -241,15 +240,12 @@ export function TwoFactorForm() {
         error={error}
         support={`${CODE_LENGTH} numeros.`}
       >
-        <Input
+        <CodeInput
           id="codigo-2fa"
           value={codigo}
-          onChange={(event) =>
-            setCodigo(event.target.value.replace(/\D/g, "").slice(0, CODE_LENGTH))
-          }
+          onChange={setCodigo}
           invalid={Boolean(error)}
-          inputMode="numeric"
-          autoComplete="one-time-code"
+          autoFocus
         />
       </Field>
 
