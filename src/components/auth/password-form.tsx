@@ -49,7 +49,7 @@ export function PasswordForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="mt-10 max-w-sm space-y-6">
+    <form onSubmit={onSubmit} noValidate className="mt-6 max-w-sm space-y-6">
       <Field
         label="Nueva contrasena"
         htmlFor="clave"

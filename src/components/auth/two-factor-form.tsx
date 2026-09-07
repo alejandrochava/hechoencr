@@ -142,7 +142,7 @@ export function TwoFactorForm() {
 
   if (estado.paso === "cargando") {
     return (
-      <div className="mt-10 max-w-sm space-y-3" aria-busy="true">
+      <div className="mt-6 max-w-sm space-y-3" aria-busy="true">
         <span className="sr-only">Cargando</span>
         <Skeleton className="h-11 w-56" />
         <Skeleton className="h-4 w-full" />
@@ -152,10 +152,14 @@ export function TwoFactorForm() {
 
   if (estado.paso === "listo") {
     return (
-      <div className="mt-10 max-w-lg space-y-4">
+      <div className="mt-6 max-w-lg space-y-4">
         <p className="text-sm leading-relaxed">
           <span className="font-medium">Activo.</span> Antes de dejarte pasar a la administracion
           te vamos a pedir el codigo de tu app.
+        </p>
+        <p className="text-sm leading-relaxed text-muted">
+          Si perdes el telefono y no guardaste el codigo de respaldo, se recupera dando de baja el
+          factor desde el panel de Supabase.
         </p>
 
         {error ? <p className="text-sm text-flag">{error}</p> : null}
@@ -201,7 +205,7 @@ export function TwoFactorForm() {
   }
 
   return (
-    <form onSubmit={confirmar} noValidate className="mt-10 max-w-lg space-y-6">
+    <form onSubmit={confirmar} noValidate className="mt-6 max-w-lg space-y-6">
       <div className="rounded-card border border-border p-5">
         <p className="text-sm leading-relaxed">
           Escanea esto con tu app de autenticacion y despues escribi el codigo que muestre.
@@ -219,6 +223,15 @@ export function TwoFactorForm() {
           Si no podes escanear, escribi este codigo a mano:
         </p>
         <code className="mt-1 block break-all font-mono text-xs text-muted">{estado.secreto}</code>
+
+        {/*
+          El aviso va aca y no arriba de todo: recien ahora hay algo concreto
+          que guardar, y decirlo antes de empezar solo asusta.
+        */}
+        <p className="mt-4 border-t border-border/70 pt-4 text-xs leading-relaxed text-muted">
+          Guarda ese codigo en algun lado. Si perdes el telefono es lo unico que te devuelve el
+          acceso; si no, hay que dar de baja el factor desde el panel de Supabase.
+        </p>
       </div>
 
       <Field

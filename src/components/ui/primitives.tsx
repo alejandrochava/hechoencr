@@ -137,3 +137,20 @@ export function Toggle({
     </label>
   );
 }
+
+/**
+ * Lo que se ve cuando una lista esta vacia.
+ *
+ * Una linea gris centrada se lee como si la pagina se hubiera roto. Esto dice
+ * que no hay nada **y** que va a aparecer ahi cuando lo haya.
+ */
+export function Empty({ title, children }: { title: string; children?: ReactNode }) {
+  return (
+    <div className="rounded-card border border-dashed border-border-strong px-6 py-12 text-center">
+      <p className="font-medium">{title}</p>
+      {children ? (
+        <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted">{children}</p>
+      ) : null}
+    </div>
+  );
+}

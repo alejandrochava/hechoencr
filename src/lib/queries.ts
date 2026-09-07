@@ -164,7 +164,11 @@ export async function isCurrentUserAdmin() {
   return Boolean((await getViewer())?.isAdmin);
 }
 
-export async function getPendingClaims(): Promise<PendingClaim[]> {
+/*
+ * Cacheadas: la administracion las pide dos veces por pagina, una para la
+ * lista y otra para el numerito de la pestana. Es la misma consulta.
+ */
+export const getPendingClaims = cache(async (): Promise<PendingClaim[]> => {
   if (!isSupabaseConfigured) return [];
 
   const supabase = await createClient();
@@ -188,7 +192,7 @@ export async function getPendingClaims(): Promise<PendingClaim[]> {
     project: Array.isArray(row.project) ? (row.project[0] ?? null) : row.project,
     user: Array.isArray(row.user) ? (row.user[0] ?? null) : row.user,
   })) as unknown as PendingClaim[];
-}
+});
 
 export async function getProfileByHandle(handle: string): Promise<Profile | null> {
   if (!isSupabaseConfigured) return null;
@@ -223,7 +227,7 @@ export async function getProjectsByOwner(ownerId: string): Promise<FeedProject[]
   return (data ?? []) as FeedProject[];
 }
 
-export async function getMessages(): Promise<ContactMessage[]> {
+export const getMessages = cache(async (): Promise<ContactMessage[]> => {
   if (!isSupabaseConfigured) return [];
 
   const supabase = await createClient();
@@ -239,7 +243,7 @@ export async function getMessages(): Promise<ContactMessage[]> {
     return [];
   }
   return (data ?? []) as ContactMessage[];
-}
+});
 
 /**
  * Todo lo que va en el sitemap: las fichas publicadas y los perfiles publicos.
