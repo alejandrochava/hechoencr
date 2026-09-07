@@ -42,7 +42,12 @@ export type Identidad = {
   identity_data?: Record<string, unknown>;
 };
 
-export type Usuario = { id: string; identities?: Identidad[] };
+export type Usuario = {
+  id: string;
+  identities?: Identidad[];
+  /** Nivel del token. Sin decir nada se asume aal2, que es el caso normal. */
+  aal?: string;
+};
 
 export type ConfigFake = {
   user?: Usuario | null;

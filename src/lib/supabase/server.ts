@@ -32,7 +32,12 @@ export const createClient = cache(async () => {
 });
 
 /** Quien esta autenticado, con lo que el token trae y el sitio usa. */
-export type SessionUser = { id: string; email: string | null };
+export type SessionUser = {
+  id: string;
+  email: string | null;
+  /** aal2 solo despues de probar el segundo factor. La administracion lo exige. */
+  aal: string;
+};
 
 /**
  * El usuario autenticado, o null si no hay sesion.
@@ -56,8 +61,8 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
 
   if (error || !data) return null;
 
-  const { sub, email } = data.claims;
-  return { id: sub, email: typeof email === "string" ? email : null };
+  const { sub, email, aal } = data.claims;
+  return { id: sub, email: typeof email === "string" ? email : null, aal };
 });
 
 /**

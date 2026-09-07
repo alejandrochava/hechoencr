@@ -119,6 +119,18 @@ export async function proxy(request: NextRequest) {
       url.search = "";
       return NextResponse.redirect(url);
     }
+
+    /*
+     * Ser admin no alcanza: hace falta haber probado el segundo factor. Quien
+     * manda es `public.is_admin()` en la base, que exige lo mismo; esto esta
+     * para que la persona vea la pantalla del codigo y no una pagina vacia.
+     */
+    if (sesion?.claims.aal !== "aal2") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/cuenta/verificar";
+      url.search = `?next=${encodeURIComponent(pathname)}`;
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

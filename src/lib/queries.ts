@@ -150,7 +150,13 @@ export const getViewer = cache(async () => {
     handle: profile?.handle ?? null,
     name: profile?.display_name ?? user.email?.split("@")[0] ?? "vos",
     avatar: profile?.avatar_url ?? null,
-    isAdmin: Boolean(profile?.is_admin),
+    /*
+     * Ser admin es la marca en la base **y** haber probado el segundo factor.
+     * Va junto a proposito: asi lo exige `public.is_admin()` en RLS, y si aca
+     * dijera que si con aal1, el sitio ofreceria acciones que la base va a
+     * rechazar despues, en silencio y afectando cero filas.
+     */
+    isAdmin: Boolean(profile?.is_admin) && user.aal === "aal2",
   };
 });
 

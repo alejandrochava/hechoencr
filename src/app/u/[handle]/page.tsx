@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
@@ -92,8 +93,24 @@ export default async function ProfilePage({ params }: PageProps<"/u/[handle]">) 
           </div>
 
           {isMe ? (
-            <div className="mt-6 border-t border-border/70 pt-5">
+            <div className="mt-6 space-y-5 border-t border-border/70 pt-5">
               <ProfileVisibility initial={profile.public_profile} />
+
+              {/* Las dos paginas de /cuenta existian sin entrada desde ningun lado. */}
+              <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                <Link
+                  href="/cuenta/2fa"
+                  className="text-muted transition-colors duration-200 ease-brand hover:text-text"
+                >
+                  Segundo factor
+                </Link>
+                <Link
+                  href="/cuenta/clave"
+                  className="text-muted transition-colors duration-200 ease-brand hover:text-text"
+                >
+                  Tu contrasena
+                </Link>
+              </div>
             </div>
           ) : null}
         </div>

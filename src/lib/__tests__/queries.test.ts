@@ -21,7 +21,9 @@ vi.mock("@/lib/supabase/server", () => ({
     const cliente = dobles.cliente as {
       auth: { getUser: () => Promise<{ data: { user: unknown } }> };
     };
-    return (await cliente.auth.getUser()).data.user;
+    const user = (await cliente.auth.getUser()).data.user as { aal?: string } | null;
+    // aal2 salvo que la prueba diga otra cosa: el caso raro es el otro.
+    return user ? { aal: "aal2", ...user } : null;
   },
 }));
 
@@ -316,11 +318,22 @@ describe("isCurrentUserAdmin", () => {
     expect(consultas).toHaveLength(0);
   });
 
-  it("lee el rol de la base, no del token", async () => {
+  it("el rol se lee de la base, no del token", async () => {
     const { consultas } = db({ user: { id: "u1" }, singles: [{ data: { is_admin: true } }] });
 
     expect(await isCurrentUserAdmin()).toBe(true);
     expect(consultas[0]).toMatchObject({ table: "profiles", filters: [["id", "u1"]] });
+  });
+
+  it("la marca sola no alcanza: sin segundo factor no es admin", async () => {
+    /*
+     * Lo mismo exige public.is_admin() en la base. Si aca dijera que si con
+     * aal1, el sitio ofreceria acciones que RLS va a rechazar despues, en
+     * silencio y afectando cero filas.
+     */
+    db({ user: { id: "u1", aal: "aal1" }, singles: [{ data: { is_admin: true } }] });
+
+    expect(await isCurrentUserAdmin()).toBe(false);
   });
 
   it("un perfil sin el campo no es admin", async () => {

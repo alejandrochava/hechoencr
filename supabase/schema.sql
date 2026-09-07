@@ -206,9 +206,22 @@ create index if not exists messages_created_at_idx on public.messages (created_a
 -- ---------------------------------------------------------------------
 -- Helpers
 -- ---------------------------------------------------------------------
+-- Ser admin es la marca en profiles **y** haber probado el segundo factor.
+--
+-- El nivel viaja en el token: aal1 es "entro con su cuenta", aal2 es "ademas
+-- confirmo el codigo". Se pide aca, y no solo en el proxy, porque esta funcion
+-- es la que usan las politicas de claims y messages y la que consulta
+-- resolve_claim: si el filtro viviera arriba, una peticion armada a mano lo
+-- saltearia entero.
+--
+-- Se pide siempre, tenga o no un factor dado de alta: un admin sin segundo
+-- factor no entra, y lo activa desde /cuenta/2fa, que no pasa por aca. Si se
+-- pierde el telefono, se recupera dando de baja el factor desde el panel de
+-- Supabase (Authentication -> Users).
 create or replace function public.is_admin()
 returns boolean language sql stable security definer set search_path = public as $$
-  select coalesce((select is_admin from public.profiles where id = auth.uid()), false);
+  select coalesce((select is_admin from public.profiles where id = auth.uid()), false)
+     and coalesce(auth.jwt() ->> 'aal', 'aal1') = 'aal2';
 $$;
 
 -- Suma una visita sin exponer un UPDATE abierto sobre projects.
