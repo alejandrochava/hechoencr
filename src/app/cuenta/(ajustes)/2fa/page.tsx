@@ -8,8 +8,8 @@ export const metadata: Metadata = { title: "Segundo factor" };
 export default function DosFactoresPage() {
   return (
     <>
-      <h2 className="text-lg font-semibold">Segundo factor</h2>
-      <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted">
+      {/* Sin titulo: la pestana de arriba ya dice en cual estamos. */}
+      <p className="max-w-lg text-sm leading-relaxed text-muted">
         Un codigo de seis numeros, sacado de una app en tu telefono, que cambia cada rato. La
         administracion lo pide: con la cuenta sola no se entra ahi.
       </p>

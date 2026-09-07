@@ -8,8 +8,8 @@ export const metadata: Metadata = { title: "Tu contrasena" };
 export default function ClavePage() {
   return (
     <>
-      <h2 className="text-lg font-semibold">Contrasena</h2>
-      <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted">
+      {/* Sin titulo: la pestana de arriba ya dice en cual estamos. */}
+      <p className="max-w-lg text-sm leading-relaxed text-muted">
         No hace falta tener una: siempre podes entrar con el enlace que te mandamos al correo.
         Ponerle contrasena solo hace mas rapido volver.
       </p>
