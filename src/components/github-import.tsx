@@ -7,6 +7,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { Skeleton, Tag } from "@/components/ui/primitives";
+import { useToast } from "@/components/ui/toast";
 import { listMyGithubRepos, type ImportableRepo } from "@/lib/actions";
 import { tagLabel } from "@/lib/site";
 
@@ -28,6 +29,7 @@ export function GithubImport({ onPick }: { onPick: (draft: Partial<ProjectDraft>
   const [handle, setHandle] = useState("");
   const [error, setError] = useState<Fallo | null>(null);
   const [busqueda, setBusqueda] = useState("");
+  const { show } = useToast();
 
   async function traer() {
     setCargando(true);
@@ -68,6 +70,12 @@ export function GithubImport({ onPick }: { onPick: (draft: Partial<ProjectDraft>
     });
     setOpen(false);
     setBusqueda("");
+
+    /*
+     * El modal se cierra y los campos aparecen llenos mas abajo, fuera de la
+     * vista: sin decir nada, el clic se siente como si no hubiera hecho nada.
+     */
+    show(`Llenamos el formulario con ${repo.fullName}. Revisalo antes de publicar.`);
   }
 
   const termino = busqueda.trim().toLowerCase();

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ActionButton } from "@/components/action-button";
+import { ButtonLink } from "@/components/ui/button";
 import { Container, Tag } from "@/components/ui/primitives";
 import { markMessageHandled } from "@/lib/actions";
 import { getMessages } from "@/lib/queries";
@@ -61,17 +62,21 @@ export default async function MensajesPage() {
                 {message.body}
               </p>
 
-              <form
-                className="mt-4"
-                action={async () => {
-                  "use server";
-                  await markMessageHandled(message.id, !message.handled);
-                }}
-              >
-                <Button type="submit" variant={message.handled ? "ghost" : "secondary"} size="sm">
+              <div className="mt-4">
+                <ActionButton
+                  variant={message.handled ? "ghost" : "secondary"}
+                  size="sm"
+                  done={
+                    message.handled ? "Vuelve a estar pendiente." : "Mensaje marcado como atendido."
+                  }
+                  action={async () => {
+                    "use server";
+                    await markMessageHandled(message.id, !message.handled);
+                  }}
+                >
                   {message.handled ? "Marcar como pendiente" : "Marcar como atendido"}
-                </Button>
-              </form>
+                </ActionButton>
+              </div>
             </li>
           ))}
         </ul>

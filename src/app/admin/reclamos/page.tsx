@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ActionButton } from "@/components/action-button";
+import { ButtonLink } from "@/components/ui/button";
 import { Container } from "@/components/ui/primitives";
 import { resolveClaim } from "@/lib/actions";
 import { getPendingClaims, isCurrentUserAdmin } from "@/lib/queries";
@@ -59,26 +60,26 @@ export default async function ReclamosPage() {
               </p>
 
               <div className="mt-4 flex gap-2">
-                <form
+                <ActionButton
+                  variant="primary"
+                  done="Reclamo aprobado. El proyecto quedo a nombre de quien lo pidio."
                   action={async () => {
                     "use server";
                     await resolveClaim(claim.id, true);
                   }}
                 >
-                  <Button type="submit" variant="primary">
-                    Aprobar
-                  </Button>
-                </form>
-                <form
+                  Aprobar
+                </ActionButton>
+                <ActionButton
+                  variant="secondary"
+                  done="Reclamo rechazado."
                   action={async () => {
                     "use server";
                     await resolveClaim(claim.id, false);
                   }}
                 >
-                  <Button type="submit" variant="secondary">
-                    Rechazar
-                  </Button>
-                </form>
+                  Rechazar
+                </ActionButton>
               </div>
             </li>
           ))}
