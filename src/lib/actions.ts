@@ -24,15 +24,12 @@ import {
   titleFromSlug,
   type ProjectLink,
 } from "@/lib/text";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser, getLinkedIdentities } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/types";
 
 /** Vota o quita el voto. Un solo boton, un solo voto por persona. */
 export async function toggleVote(projectId: string, slug?: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([createClient(), getCurrentUser()]);
 
   if (!user) redirect("/entrar");
 
@@ -192,10 +189,7 @@ async function checkProjectForm(formData: FormData): Promise<ProjectCheck> {
 }
 
 export async function submitProject(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([createClient(), getCurrentUser()]);
 
   if (!user) return { error: "necesita-sesion" };
 
@@ -254,10 +248,7 @@ export async function submitProject(_prev: ActionState, formData: FormData): Pro
  * veria como si se hubiera guardado.
  */
 export async function updateProject(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([createClient(), getCurrentUser()]);
 
   if (!user) return { error: "necesita-sesion" };
 
@@ -349,10 +340,7 @@ export type ReposState =
  * escribir ocho campos, no se saltea ninguna regla.
  */
 export async function listMyGithubRepos(): Promise<ReposState> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([createClient(), getCurrentUser()]);
 
   if (!user) {
     return {
@@ -449,13 +437,16 @@ export async function listMyGithubRepos(): Promise<ReposState> {
 }
 
 export async function syncGithubHandle() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [supabase, user, identities] = await Promise.all([
+    createClient(),
+    getCurrentUser(),
+    // Las identidades no viajan en el token: esta es la unica parte del sitio
+    // que necesita saber con que cuenta ajena entro la persona.
+    getLinkedIdentities(),
+  ]);
   if (!user) return null;
 
-  const github = user.identities?.find((identity) => identity.provider === "github");
+  const github = identities.find((identity) => identity.provider === "github");
   const handle =
     (github?.identity_data?.user_name as string | undefined) ??
     (github?.identity_data?.preferred_username as string | undefined);
@@ -490,10 +481,7 @@ export async function claimWithGithub(projectId: string, slug: string): Promise<
 }
 
 export async function claimProject(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([createClient(), getCurrentUser()]);
 
   if (!user) return { error: "Entra con tu cuenta para reclamar el proyecto." };
 
@@ -602,10 +590,7 @@ export async function sendMessage(_prev: ActionState, formData: FormData): Promi
     return { error: "Revisa los campos marcados.", fields };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([createClient(), getCurrentUser()]);
 
   const { error } = await supabase
     .from("messages")
@@ -624,10 +609,7 @@ export async function sendMessage(_prev: ActionState, formData: FormData): Promi
 
 /** El autor decide si su nombre aparece o no junto a sus proyectos. */
 export async function setProfileVisibility(visible: boolean) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([createClient(), getCurrentUser()]);
   if (!user) return;
 
   const { data: profile } = await supabase

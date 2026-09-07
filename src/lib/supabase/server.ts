@@ -31,19 +31,43 @@ export const createClient = cache(async () => {
   });
 });
 
+/** Quien esta autenticado, con lo que el token trae y el sitio usa. */
+export type SessionUser = { id: string; email: string | null };
+
 /**
  * El usuario autenticado, o null si no hay sesion.
  *
- * Va envuelto en el cache de React porque `getUser()` no lee la cookie y ya:
- * pregunta a Supabase por la red para validar el token. En una sola pagina lo
- * necesitan el layout, el encabezado y la consulta de turno, y sin esto cada
- * uno pagaba su propia vuelta contra el mismo dato. El cache dura lo que dura
- * el request, asi que sigue sin cruzarse entre visitantes.
+ * El token se verifica **localmente**: el proyecto firma con ES256 y publica
+ * su JWKS, asi que `getClaims()` comprueba la firma con WebCrypto en vez de
+ * preguntarle a Supabase por la red si el token vale, que es lo que hace
+ * `getUser()`. Esa vuelta la pagaban el proxy, el layout, el encabezado y la
+ * consulta de la pagina, una detras de otra.
+ *
+ * El cache de React deja ademas una sola verificacion por request.
+ *
+ * Lo que se cede: una sesion cerrada desde otro dispositivo se sigue
+ * aceptando hasta que el token vence. No afecta a los permisos —los aplica
+ * RLS contra la base en cada consulta, con ese mismo token— ni a ser admin,
+ * que se lee de `profiles` y no del token.
  */
-export const getCurrentUser = cache(async () => {
+export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
+  const { data, error } = await supabase.auth.getClaims();
+
+  if (error || !data) return null;
+
+  const { sub, email } = data.claims;
+  return { id: sub, email: typeof email === "string" ? email : null };
+});
+
+/**
+ * Las identidades enlazadas a la sesion (GitHub, Google, correo).
+ *
+ * No viajan en el token, asi que esto si le pregunta a Supabase. Lo usa solo
+ * quien necesita saber con que cuenta ajena entro la persona.
+ */
+export const getLinkedIdentities = cache(async () => {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUserIdentities();
+  return data?.identities ?? [];
 });

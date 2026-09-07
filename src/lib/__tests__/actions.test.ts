@@ -13,7 +13,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * corren de verdad, porque son parte de la decision.
  */
 
-const dobles = vi.hoisted(() => ({ cliente: null as unknown }));
+const dobles = vi.hoisted(() => ({
+  cliente: null as unknown,
+  usuario: null as {
+    id: string;
+    identities?: { provider: string; identity_data?: Record<string, unknown> }[];
+  } | null,
+}));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
@@ -25,7 +31,16 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => dobles.cliente }));
+/*
+ * getCurrentUser y getLinkedIdentities ya no salen por el cliente: la sesion se
+ * verifica contra el token. Se doblan con lo mismo que configura fakeSupabase,
+ * asi que las pruebas siguen diciendo db({ user }).
+ */
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => dobles.cliente,
+  getCurrentUser: async () => dobles.usuario,
+  getLinkedIdentities: async () => dobles.usuario?.identities ?? [],
+}));
 vi.mock("@/lib/link-check", () => ({
   checkSite: vi.fn(),
   checkRepo: vi.fn(),
@@ -48,6 +63,7 @@ import { correr, fakeSupabase, type ConfigFake } from "./fake-supabase";
 function db(config: ConfigFake = {}) {
   const fake = fakeSupabase(config);
   dobles.cliente = fake.client;
+  dobles.usuario = config.user ?? null;
   return fake;
 }
 

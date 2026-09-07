@@ -88,23 +88,29 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  /*
+   * El token se verifica aca mismo contra el JWKS del proyecto, sin ir a
+   * preguntarle a Supabase si vale: el proxy corre en practicamente cada
+   * request y esa vuelta se pagaba entera, incluso en las precargas de
+   * enlaces. Si esta por vencer, getClaims lo refresca antes, asi que la
+   * cookie se sigue renovando como siempre.
+   */
+  const { data: sesion } = await supabase.auth.getClaims();
+  const userId = sesion?.claims.sub ?? null;
 
-  if (matches(pathname, NEEDS_SESSION) && !user) {
+  if (matches(pathname, NEEDS_SESSION) && !userId) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = `?login=1&next=${encodeURIComponent(pathname)}`;
     return NextResponse.redirect(url);
   }
 
-  if (matches(pathname, NEEDS_ADMIN) && user) {
+  if (matches(pathname, NEEDS_ADMIN) && userId) {
     // El rol vive en la base, no en el token: una lectura, y solo bajo /admin.
     const { data: profile } = await supabase
       .from("profiles")
       .select("is_admin")
-      .eq("id", user.id)
+      .eq("id", userId)
       .maybeSingle();
 
     if (!profile?.is_admin) {
